@@ -50,7 +50,7 @@ local CONFIRM_H, CONFIRM_ROOM = 110, 74
 local CONFIRM_PANEL_W, CONFIRM_TEXT_W, CONFIRM_TEXT_SIZE, CONFIRM_TEXT_Y, CONFIRM_BUTTON_GAP = 340, 310, 13, 18, 4
 local DEFAULT_PROFILE = "Default"
 local DB_VERSION = 1
-local GUID_PATTERN, HEX = "^Player%-(%d+)%-(%x+)$", 16
+local GUID_PATTERN = "^Player%-(%d+)%-(%x+)$"
 local SCALE_DEFAULT, SCALE_MIN, SCALE_MAX, PERCENT = 100, 50, 200, 100
 local LOGIN_APPLY_DELAY = 1
 local DAMAGE_METER_ADDON, GAME_METER_CVAR, GAME_METER_SAVED = "NaowhForever_DamageMeter", "damageMeterEnabled",
@@ -141,7 +141,7 @@ function ns.Lower(text)
     return (text:lower():gsub(LATIN_CAPITAL, LatinLower))
 end
 
-ns.CODE_BUILD = "1.4.3"
+ns.CODE_BUILD = "1.4.5"
 
 ns.THEME = {
     bg     = { r = 0x19 / 255, g = 0x1b / 255, b = 0x1d / 255 },
@@ -1111,7 +1111,20 @@ end
 local activeRoot, provisional
 
 local function CharKey()
-    return UnitName("player") .. "-" .. GetRealmName()
+    local name, surname = UnitFullName("player")
+    if surname and surname ~= "" then name = name .. " " .. surname end
+    return name .. "-" .. ns.RealmName()
+end
+
+function ns.CharKey(store)
+    local key = CharKey()
+    if store and store[key] == nil then
+        local first = UnitName("player") .. "-"
+        local old = first .. ns.RealmName()
+        if store[old] == nil then old = first end
+        if old ~= key then store[key], store[old] = store[old], nil end
+    end
+    return key
 end
 
 local function NewInstall()
@@ -1130,6 +1143,36 @@ local function DB()
     return sv
 end
 
+do
+    local REALM_IN_KEY = "^[^-]+%-(.+)$"
+    local realm
+
+    local function SavedRealm(server)
+        local guids = DB().charGuid
+        if type(guids) ~= "table" then return nil end
+        for char, guid in pairs(guids) do
+            if type(guid) == "string" and guid:match(GUID_PATTERN) == server then
+                local name = char:match(REALM_IN_KEY)
+                if name and name ~= server then return name end
+            end
+        end
+    end
+
+    function ns.RealmName()
+        if realm then return realm end
+        local name = GetRealmName()
+        if name ~= "" then
+            realm = name
+            return realm
+        end
+        local guid = UnitGUID("player")
+        local server = type(guid) == "string" and guid:match(GUID_PATTERN)
+        if not server then return "" end
+        realm = SavedRealm(server) or server
+        return realm
+    end
+end
+
 local function ProvisionalRoot(sv)
     local default = sv.defaultProfile or DEFAULT_PROFILE
     if type(sv.profiles[default]) ~= "table" then sv.profiles[default] = {} end
@@ -1138,17 +1181,32 @@ local function ProvisionalRoot(sv)
 end
 
 local function AssignedProfile(sv)
-    local name = sv.charActive[CharKey()]
+    local key, first = CharKey(), UnitName("player") .. "-"
+    for _, old in ipairs({ first .. ns.RealmName(), first }) do
+        local mine = type(sv.charGuid) == "table" and sv.charGuid[old] == UnitGUID("player")
+        if key ~= old and sv.charActive[old] ~= nil and (mine or old ~= first) then
+            if sv.charActive[key] == nil then
+                sv.charActive[key] = sv.charActive[old]
+                if type(sv.charAsk) == "table" then sv.charAsk[key] = sv.charAsk[old] end
+            end
+            if mine then
+                sv.charActive[old], sv.charGuid[old] = nil, nil
+                if type(sv.charSeen) == "table" then sv.charSeen[old] = nil end
+                if type(sv.charAsk) == "table" then sv.charAsk[old] = nil end
+            end
+        end
+    end
+    local name = sv.charActive[key]
     if type(name) == "string" and type(sv.profiles[name]) == "table" then return name end
     if name == nil and next(sv.charActive) ~= nil then
         if type(sv.charAsk) ~= "table" then sv.charAsk = {} end
-        sv.charAsk[CharKey()] = true
+        sv.charAsk[key] = true
     end
     name = type(name) == "string" and name or sv.defaultProfile or DEFAULT_PROFILE
     if type(sv.profiles[name]) ~= "table" and type(sv.defaultProfile) == "string" then
         name = sv.defaultProfile
     end
-    sv.charActive[CharKey()] = name
+    sv.charActive[key] = name
     return name
 end
 
@@ -1356,39 +1414,15 @@ local function Better(char, when, count, best, bestSeen, bestUses)
     return count > bestUses or (count == bestUses and char < best)
 end
 
-local function GuidOrder(guid)
-    if type(guid) ~= "string" then return nil end
-    local server, counter = guid:match(GUID_PATTERN)
-    counter = counter and tonumber(counter, HEX)
-    if not counter then return nil end
-    return server, counter
-end
-
 local function Offerable(sv, char, me, profile)
     return char ~= me and char:sub(1, #UNKNOWNOBJECT + 1) ~= UNKNOWNOBJECT .. "-"
         and type(sv.profiles[profile]) == "table"
-end
-
-local function FirstMade(sv, me)
-    local server = GuidOrder(UnitGUID("player"))
-    if not server or type(sv.charGuid) ~= "table" then return nil end
-    local best, bestProfile, bestCounter
-    for char, profile in pairs(sv.charActive) do
-        local theirs, counter = GuidOrder(sv.charGuid[char])
-        if theirs == server and Offerable(sv, char, me, profile)
-            and (not best or counter < bestCounter or (counter == bestCounter and char < best)) then
-            best, bestProfile, bestCounter = char, profile, counter
-        end
-    end
-    return best, bestProfile
 end
 
 function ns.ImportCandidate()
     local sv = DB()
     local me = CharKey()
     if type(sv.charAsk) ~= "table" or not sv.charAsk[me] then return nil end
-    local first, firstProfile = FirstMade(sv, me)
-    if first then return first, firstProfile end
     local seen = type(sv.charSeen) == "table" and sv.charSeen or {}
     local uses = ProfileUses(sv, me)
     local best, bestProfile, bestSeen, bestUses

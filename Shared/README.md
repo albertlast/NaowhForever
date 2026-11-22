@@ -21,6 +21,8 @@ Shared/
     FactionItems.lua the same for the factions' rewards, added to it, from Tools/build/factions.py
     SameMaps.lua     the maps the game has under two IDs, each to the one whose data it reads
                      (Shared.SameMaps), from Tools/build/same_maps.py
+    Replaced.lua     the classic items Forever replaced with its own, classic ID -> Forever's
+                     (Shared.Replaced), from Tools/build/forever_replaced.py: the BiS List names and counts them as Forever's
   Decode.lua       a pasted import string read back as plain data, with size, depth and bomb caps, and
                    outside text cleaned for display (Decode.String, Decode.Text)
   Encode.lua       plain data written as a code the Naowh website reads: LibSerialize's version 1 form
@@ -37,15 +39,16 @@ Shared/
   Game/Consumables.lua your best food and drink in your bags (ns.BestFoodAndDrink), the healthstones,
                    healing and mana potions, best first (ns.HEALTHSTONES, ns.HEALING_POTIONS,
                    ns.MANA_POTIONS), the food spells and Well Fed buffs (ns.FOOD_SPELLS, ns.WELL_FED),
-                   whether you use mana (ns.UsesMana) and whether an item is a drink (ns.IsDrink): QoL's
+                   whether you use mana (ns.UsesMana), whether an item is a drink (ns.IsDrink) and whether
+                   you are drinking (ns.IsDrinking: Gear & Trinkets' Wear While Drinking): QoL's
                    Food & Drink Bar, the Macros' Smart Macros, Aura Buffs' reminders and the Consumable Bar
   Game/ActionKeys.lua the keys on action buttons: the game's bars, LibActionButton bars and EllesmereUI's
                    (Shared.ActionKeys): the Consumable Bar's and the Food & Drink Bar's Show Keybinds
   Game/Roster.lua  our part of a player's tooltip in the Guild & Communities and Friends lists (Badges, Gear Score)
   Game/Places.lua  zones by name, the map whose data a map reads (Places.SameMap), and showing one on the
                    world map
-  Game/Layers.lua  the layer an NPC is on, from its GUID (Shared.LayerOf): QoL's Layer Tracker and
-                   Discovery's rare kills
+  Game/Layers.lua  the layer or instance copy an NPC is on, from its GUID (Shared.LayerOf): the Dungeon
+                   Journal's run reset
   Game/Towns.lua   town service NPCs by world map (ns.TownNPCs) and the capitals (ns.TownCapitals), by hand:
                    QoL's town pins, the Training Planner's trainers and Professions' rank alerts read it
   Game/Played.lua  the character's /played time, asked for once with the chat print muted (XP Bar, XP per Hour)

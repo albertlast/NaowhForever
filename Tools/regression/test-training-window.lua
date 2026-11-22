@@ -136,6 +136,7 @@ local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.up
     UIFontPath = function() return "font" end,
     UIScale = function() return 1 end,
     AccountSettings = function() return account end,
+    CharKey = function() return "Me-Realm" end,
     Print = function(m) printed[#printed + 1] = m end,
     TownNPCs = { [1453] = { { 38.4, 79.4, "class", "Elsharin", "Mage Trainer", "MAGE", "A" } } },
     TownCapitals = { [1453] = true },
@@ -150,6 +151,7 @@ local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.up
     OpenOptionsWindow = NOTHING,
     Apply = NOTHING,
 }
+ns.RealmName = function() return "Realm" end
 function ns.OnApply(fn) local was = ns.Apply ns.Apply = function(...) was(...) fn(...) end end
 local env = setmetatable({
     NaowhForever = ns,
@@ -206,7 +208,7 @@ local env = setmetatable({
 env._G = env
 
 Load({
-    "Shared/Shared.lua", "Shared/Data/Forever.lua", "Shared/Style.lua", "Shared/Game/Items.lua", "Shared/Game/Gear.lua", "Shared/Game/Places.lua",
+    "Shared/Shared.lua", "Shared/Data/Replaced.lua", "Shared/Data/Forever.lua", "Shared/Style.lua", "Shared/Game/Items.lua", "Shared/Game/Gear.lua", "Shared/Game/Places.lua",
     "Shared/UI/Parts.lua", "Shared/UI/GamepadNav.lua", "Shared/UI/Marks.lua", "Shared/UI/Text.lua", "Shared/UI/Hud.lua", "Shared/UI/Timer.lua", "Shared/UI/Share.lua", "Shared/UI/Panels.lua", "Shared/UI/Window.lua", "Shared/UI/Tabs.lua", "Shared/UI/SettingsCard.lua", "Shared/View/View.lua", "Shared/View/Kinds.lua",
     "Shared/Settings/Settings.lua",
     "Core/Features.lua",

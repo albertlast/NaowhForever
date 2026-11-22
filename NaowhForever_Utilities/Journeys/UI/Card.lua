@@ -12,7 +12,14 @@ local MEDIA = "Interface\\AddOns\\NaowhForever_Utilities\\Journeys\\Media\\"
 local COG = ns.UI.COGS_ICON
 local CROSS = ns.MEDIA .. "cross"
 local SETTINGS_PAGE = "Journeys/Settings"
-local PLACE = { "RIGHT", "RIGHT", -260, 40 }
+local PLACE = { point = "RIGHT", relPoint = "RIGHT", x = -260, y = 40 }
+local EDGE = { down = "TOP", up = "BOTTOM" }
+local TOWARD = { down = 1, up = -1 }
+local MOVER_GROW = { down = "DOWN", up = "UP" }
+local SIDE = { TOPLEFT = "LEFT", TOP = "", TOPRIGHT = "RIGHT", LEFT = "LEFT", CENTER = "", RIGHT = "RIGHT",
+    BOTTOMLEFT = "LEFT", BOTTOM = "", BOTTOMRIGHT = "RIGHT" }
+local RISE = { TOPLEFT = 1, TOP = 1, TOPRIGHT = 1, LEFT = 0, CENTER = 0, RIGHT = 0,
+    BOTTOMLEFT = -1, BOTTOM = -1, BOTTOMRIGHT = -1 }
 local MODE_ICON = { walk = "walk", fly = "fly", ship = "ship", tram = "tram", portal = "portal", hearth = "hearth",
     teleport = "teleport", lift = "lift" }
 local CARD_W, PAD, HEADER_H, STRIP_H = 280, 12, 34, 2
@@ -26,6 +33,7 @@ local BUTTON_GAP = 6
 local CURRENT_SEG = 0.5
 local HIGHLIGHT_ALPHA = 0.35
 local MINUTE = 60
+local PREVIEW_STEP = 0.15
 local TEXT_TIME = "%d:%02d"
 local TEXT_WAIT = ns.L("wait %s")
 local TEXT_COG = ns.L("Journey settings")
@@ -35,6 +43,7 @@ local TEXT_NAME = "Journey Card"
 local card
 local rows, segs = {}, {}
 local segH = SEG_H
+local preview, previewRows, previewTotal
 
 local function On()
     return Jy.On() and S.Get("card")
@@ -45,26 +54,29 @@ local function Clock(seconds)
     return TEXT_TIME:format(math.floor(seconds / MINUTE), seconds % MINUTE)
 end
 
-local function LoadPosition()
-    local pos = S.Get("cardPos")
-    if type(pos) == "table" then return pos.point, pos.relPoint, pos.x, pos.y end
-end
-
 local function SavePosition(point, relPoint, x, y)
-    S.Set("cardPos", { point = point, relPoint = relPoint, x = x, y = y })
+    S.Set("cardPos", { point = point, relPoint = relPoint, x = x, y = y, h = card:GetHeight() })
 end
 
 local function Place()
+    local pos = S.Get("cardPos")
+    if type(pos) ~= "table" or type(pos.point) ~= "string" then pos = PLACE end
+    local grow = S.Get("cardGrow")
+    local point, y, edge = pos.point, pos.y, EDGE[grow]
+    if edge then
+        point = edge .. SIDE[pos.point]
+        y = y + (TOWARD[grow] - RISE[pos.point]) * (pos.h or HEADER_H) / 2
+    end
     card:ClearAllPoints()
-    local point, relPoint, x, y = LoadPosition()
-    if type(point) ~= "string" then point, relPoint, x, y = PLACE[1], PLACE[2], PLACE[3], PLACE[4] end
-    card:SetPoint(point, UIParent, relPoint, x, y)
+    card:SetPoint(point, UIParent, pos.relPoint, pos.x, y)
+    ns.UI.SetMoverGrow(card.mover, MOVER_GROW[grow])
 end
 
 local function DragStop(frame)
     frame:StopMovingOrSizing()
     local point, _, relPoint, x, y = frame:GetPoint(1)
     SavePosition(point, relPoint, x, y)
+    Place()
 end
 
 local function Paint()
@@ -252,12 +264,13 @@ end
 local function Render(journey)
     local legs = journey.plan and journey.plan.legs or {}
     local total = journey.done + #legs
+    local shown = math.min(#legs, previewRows or #legs)
     card.title:SetText(journey.title)
     card.total:SetText(journey.plan and Clock(journey.plan.seconds) or "")
     Segments(journey.done, math.max(total, 1))
-    for i, leg in ipairs(legs) do Fill(i, leg, i == 1) end
-    for i = #legs + 1, #rows do rows[i]:Hide() end
-    card:SetHeight(HEADER_H + segH + SEG_BELOW + #legs * ROW_H + FOOT)
+    for i = 1, shown do Fill(i, legs[i], i == 1) end
+    for i = shown + 1, #rows do rows[i]:Hide() end
+    card:SetHeight(HEADER_H + segH + SEG_BELOW + shown * ROW_H + FOOT)
 end
 
 local function Refresh()
@@ -271,11 +284,30 @@ local function Refresh()
     card:Show()
 end
 
+local function PreviewStep()
+    previewRows = previewRows + 1
+    if previewRows >= previewTotal then preview, previewRows = nil, nil end
+    Refresh()
+end
+
+local function Preview()
+    if preview then preview:Cancel() end
+    preview, previewRows = nil, nil
+    local journey = Guide.Current()
+    previewTotal = journey and journey.plan and #journey.plan.legs or 0
+    if not card:IsShown() or previewTotal == 0 then return end
+    previewRows = 0
+    Refresh()
+    preview = C_Timer.NewTicker(PREVIEW_STEP, PreviewStep, previewTotal)
+end
+
 local function OnSet(key, value)
     if not card then return Refresh() end
     if key == "cardScale" then card:SetScale(value) end
     if key == "cardAlpha" then Paint() end
+    if key == "cardGrow" then Place() end
     Refresh()
+    if key == "cardGrow" then Preview() end
 end
 
 local function ShowMover()
@@ -288,11 +320,17 @@ end
 local function HideMover()
     if not card then return end
     card.mover:Hide()
+    Place()
+    Refresh()
+end
+
+local function Apply()
+    if card then Place() end
     Refresh()
 end
 
 Guide.OnChange(Refresh)
 hooksecurefunc(S, "Set", OnSet)
-ns.OnApply(Refresh)
+ns.OnApply(Apply)
 hooksecurefunc(ns, "ShowUnlockMode", ShowMover)
 hooksecurefunc(ns, "HideUnlockMode", HideMover)

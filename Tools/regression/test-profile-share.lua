@@ -78,6 +78,7 @@ local function World()
         },
         SettingsRoot = function() return w.db.profiles[w.active] end,
         AccountSettings = function() return w.db.account end,
+        CharKey = function() return "Glyadin-Realm" end,
         ModuleDefaults = function(key) return DEFAULTS[key] end,
         ActiveProfileName = function() return w.active end,
         ProfileExists = function(name) return w.db.profiles[name] ~= nil end,
@@ -854,16 +855,6 @@ Case("Announce Quest Progress speaks in party chat for you, so it is named and l
     assert(#acting == 1 and acting[1] == "Announce Quest Progress", acting[1])
     w.ns.ImportProfile(payload, ALL)
     assert(w.db.profiles[w.switched].qol.questProgress == nil, "left out")
-end)
-
-Case("Swap Layers With Others joins a public channel for you, so it is named and left off", function()
-    local w = World()
-    w.db.profiles.Default.qol.layerRequests = true
-    local payload = assert(w.ns.DecodeProfile((w.ns.ExportProfile())))
-    local acting = w.ns.ProfileActing(payload)
-    assert(#acting == 1 and acting[1] == "Swap Layers With Others", acting[1])
-    w.ns.ImportProfile(payload, ALL)
-    assert(w.db.profiles[w.switched].qol.layerRequests == nil, "left out")
 end)
 
 Case("a Junk Marker that sells comes along asking first, unless Also Import is ticked", function()

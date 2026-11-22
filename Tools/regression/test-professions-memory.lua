@@ -294,6 +294,11 @@ local professionsFrame = Widget()
 professionsFrame.CraftingPage = { CreateButton = Widget(), SchematicForm = {} }
 function professionsFrame.CraftingPage.SchematicForm.GetRecipeInfo() return professionsFrame.CraftingPage.picked end
 function professionsFrame.CraftingPage.SelectRecipe(self, info) self.picked = info end
+professionsFrame.CraftingPage.transaction = {
+    GetEnchantAllocation = function(self) return self.enchantItem end,
+    SetEnchantAllocation = function(self, item) self.enchantItem = item end,
+}
+function professionsFrame.CraftingPage.SchematicForm.GetTransaction() return professionsFrame.CraftingPage.transaction end
 local childInfo = { professionID = PROF, professionName = "Tailoring", skillLevel = 150, maxSkillLevel = 225 }
 local itemKeys = {}
 local patternItems = {}
@@ -374,6 +379,7 @@ ns = { L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.upper, L
     AuctionAge = function() return "1h" end,
     AuctionScanSummary = function() return "Last scan" end,
 }
+ns.RealmName = function() return "Realm" end
 function ns.OnApply(fn) local was = ns.Apply ns.Apply = function(...) was(...) fn(...) end end
 
 env = {
@@ -1042,6 +1048,21 @@ check("a learned recipe no vendor sells shows no sellers", detail:IsShown() and 
 professionsFrame.CraftingPage.CreateButton.hooks.PreClick[1]()
 check("Blizzard's Create button crafts the recipe picked here",
     (professionsFrame.CraftingPage.picked or {}).recipeID == otherRecipe.spell)
+do
+    local transaction, slot = professionsFrame.CraftingPage.transaction, ns.Professions.EnchantSlot
+    check("with no item chosen here, Blizzard's Create keeps no enchant target", transaction.enchantItem == nil)
+    local location, itemGUID, item = slot.Location, env.C_Item.GetItemGUID, env.Item
+    slot.Location = function() return { guid = "bracer" } end
+    env.C_Item.GetItemGUID = function(loc) return loc.guid end
+    env.Item = { CreateFromItemGUID = function(_, guid) return { GetItemGUID = function() return guid end } end }
+    professionsFrame.CraftingPage.CreateButton.hooks.PreClick[1]()
+    check("Blizzard's Create enchants the item chosen here",
+        transaction.enchantItem and transaction.enchantItem:GetItemGUID() == "bracer")
+    slot.Location = location
+    professionsFrame.CraftingPage.CreateButton.hooks.PreClick[1]()
+    check("clearing the item here clears Blizzard's target", transaction.enchantItem == nil)
+    env.C_Item.GetItemGUID, env.Item = itemGUID, item
+end
 state.selectedID = vendorRecipe.spell
 settings.recipeFinder = false
 Redraw()

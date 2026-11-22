@@ -40,10 +40,11 @@ local REDRAW_KEYS = { vendorMaterials = true, bagReagents = true, bankReagents =
     craftProfit = true, craftProfitList = true, buyMaterials = true, buyVendor = true, craftOrders = true,
     orderTip = true, ownedAuctions = true, makeReagents = true }
 local PROFESSIONS_ADDON = "Blizzard_Professions"
+local TSM_UI, TSM_TAG = "CRAFTING", "NaowhForever:Professions"
 
 local EMPTY = {}
 local waiting = R.waiting
-local win, hooked, lastMode
+local win, hooked, lastMode, tsmHooked
 local queued = false
 local savedTabPoints, tabsLeft
 local mirrored = {}
@@ -452,8 +453,12 @@ local function BookOpen()
     return book and book:IsShown()
 end
 
+local function TsmShown()
+    return TSM_API ~= nil and TSM_API.IsUIVisible(TSM_UI)
+end
+
 local function Update()
-    if not (On() and ProfessionsFrame and ProfessionsFrame:IsShown()) then return Deactivate() end
+    if not (On() and ProfessionsFrame and ProfessionsFrame:IsShown()) or TsmShown() then return Deactivate() end
     if BookOpen() and not Links.Viewing() and not C_TradeSkillUI.IsTradeSkillGuild() then
         return Activate("book")
     end
@@ -509,6 +514,13 @@ local function OnBlizzardCreate()
     local page = ProfessionsFrame.CraftingPage
     local shown = page.SchematicForm:GetRecipeInfo()
     if not (shown and shown.recipeID == info.recipeID) then page:SelectRecipe(info) end
+    local loc = P.EnchantSlot.Location(info.recipeID)
+    local guid = loc and C_Item.GetItemGUID(loc)
+    local transaction = page.SchematicForm:GetTransaction()
+    local held = transaction:GetEnchantAllocation()
+    if (held and held:GetItemGUID()) ~= guid then
+        transaction:SetEnchantAllocation(guid and Item:CreateFromItemGUID(guid))
+    end
 end
 
 local function HookBlizzard()
@@ -557,9 +569,17 @@ local function OnEvent(_, event, name, loaded)
     Queue()
 end
 
+local function OnTsmCrafting()
+    if On() then Queue() end
+end
+
 local function Apply()
     events:UnregisterAllEvents()
     if not On() then return Deactivate() end
+    if TSM_API and not tsmHooked then
+        tsmHooked = true
+        TSM_API.RegisterUICallback(TSM_UI, TSM_TAG, OnTsmCrafting)
+    end
     for _, event in ipairs(EVENTS) do pcall(events.RegisterEvent, events, event) end
     if not C_AddOns.IsAddOnLoaded(PROFESSIONS_ADDON) then events:RegisterEvent("ADDON_LOADED") end
     OnEvent(events, "APPLY")
