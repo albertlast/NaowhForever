@@ -106,8 +106,8 @@ local CATEGORIES = {
       pages = {
           { name = "Loot", cards = { "QoL/Loot & Items:lootFeed", "QoL/Loot & Items:lootTrade",
               "QoL/Interface:undermineReal" } },
-          { name = "Bags & Junk", cards = { "QoL/Loot & Items:bagSpace", "QoL/Loot & Items:destroyCheapest",
-              "QoL/Loot & Items:scrapMarker",
+          { name = "Bags & Junk", cards = { "QoL/Loot & Items:bagCleanup", "QoL/Loot & Items:bagSpace",
+              "QoL/Loot & Items:destroyCheapest", "QoL/Loot & Items:scrapMarker",
               "QoL/Loot & Items:Open Junk List", "QoL/Loot & Items:bankMarker" } },
           { name = "Restock", cards = { "QoL/Loot & Items:restock" } },
       } },
@@ -139,7 +139,7 @@ local CATEGORIES = {
               and { "@Group Finder", "Group Finder/Settings", "QoL/Questing & Group:finderRoles", "QoL/Interface:chatZones" }
               or { "QoL/Questing & Group:finderRoles", "QoL/Interface:chatZones" } },
           { name = "Group Tools", cards = { "@Group Inspect", "Group Inspect/Settings", "QoL/Questing & Group:groupButtons",
-              "QoL/Questing & Group:freeForAll", "QoL/Questing & Group:layerSwap", "QoL/Questing & Group:layerTracker",
+              "QoL/Questing & Group:freeForAll", "QoL/Questing & Group:layerSwap",
               "QoL/Questing & Group:playerHistory" } },
       } },
     { name = "PvP", band = "COMBAT & GROUPS", navIcon = "trophy",

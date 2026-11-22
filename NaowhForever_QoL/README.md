@@ -98,10 +98,6 @@ NaowhForever_QoL/
     GroupButtons.lua    On-Screen Buttons (Invite, your invite buttons, Invite All, Disband)
     FreeForAll.lua      Always Free for All, the party loot method while you lead
     LayerSwap.lua       Auto-Accept Layer Swap, confirming the game's layer swap prompt on joining a group
-    LayerTracker.lua    Layer Tracker, the layer you are on, read from the NPCs around you, and the layers seen
-                        in your zone (ns.Layers)
-    LayerRequests.lua   Layer Tracker's swaps: asking the layer channel for an invite, other players'
-                        requests with an Invite button, leaving a swap that did not move you
     QuestProgress.lua   Announce Quest Progress, your quest objective updates said in party chat
     QuestLinks.lua      Quest Levels in Chat, the level on quest links said in chat
     QuestItems.lua      Quest Item Info, the quests an item is for on its tooltip, learned from your quest log
@@ -143,7 +139,7 @@ NaowhForever_QoL/
     Alts.lua            your characters per realm and faction (ns.AltRealm, ns.AltList, ns.OpenForgetAltMenu)
     LootFeed.lua        the Loot Feed, gold per hour and quick loot (ns.ResetLootFeedSession)
     Restock.lua         the Restock Reminder, Auto Repair and Auto Sell Junk
-    GearReminders.lua   Gear Reminders: an icon while you wear Cloak of Hermitic Bliss in Wailing Caverns or a fishing pole
+    GearReminders.lua   Gear Reminders: an icon while you wear Cloak of Hermitic Bliss in Wailing Caverns or a fishing pole, and the Argent Dawn Commission swap
     FishingData.lua     the Fishing spells by rank and the lures by the skill they add (ns.FishingData)
     FishingGear.lua     the fishing gear One-Key Fishing puts on first, and putting back what it replaced (ns.FishingGear)
     Fishing.lua         One-Key Fishing: the key, double right-click, the lure and gear steps
@@ -151,6 +147,7 @@ NaowhForever_QoL/
     FishingLoot.lua     Auto Loot While Fishing
     ScrapMarker.lua     the Junk Marker (ns.ScrapMarker), read by Bag Space and the Junk List
     BankMarker.lua      bank marks, selective grey selling and character bank deposits (ns.BankMarker)
+    BagCleanup.lua      Bag Clean-up, the everyday Bags & Junk settings on one card, and the value cap Bag Space and Destroy Cheapest read
     ScrapList.lua       the Junk List window (ns.OpenScrapList, /nf junk)
     Mail.lua            Alts and Attach buttons at the mailbox, the expiring mail warning
   Travel/
@@ -1684,6 +1681,16 @@ NaowhForever_QoL/
 - It reads on `PLAYER_EQUIPMENT_CHANGED`, `ZONE_CHANGED_NEW_AREA` and `PLAYER_ENTERING_WORLD`, registered only
   while a switch is on. Unlock Mode shows a sample of each reminder that is on (the cloak, and a Fishing Pole,
   6256).
+- Argent Dawn Commission (12846, Robin asked for it) gathers Scourgestones only in Western and Eastern
+  Plaguelands (maps 1422, 1423, from `C_Map.GetBestMapForUnit`) and Scholomance and Stratholme (instances 289,
+  329). There it shows while the trinket is in your bags, elsewhere while you wear it. Its switch also adds
+  `BAG_UPDATE_DELAYED`, so buying or looting one there shows it.
+- Clicking it swaps the trinket, out of combat only (`InCombatLockdown`), with `C_Item.EquipItemByName`. It goes
+  into an empty trinket slot, else the second one (14). Taking it off puts back the trinket last seen in that
+  slot: every update stores each trinket slot's item, unless it is the Commission, in
+  `account.commissionReturn[guid]`, so it survives a logout in the Plaguelands. Without one in your bags the
+  click does nothing.
+- Ctrl-click hides the bags icon until you leave the Plaguelands (`skipped`), and the worn icon like the others.
 
 ### Waypoint Pin
 - Quest Objectives and Downward Arrows are independent switches, initially off. Objectives come from the tracked quest or guide context and refresh on quest-log changes, which do not bring back a pin that went inside the quest's area. The three chevrons use the existing shared arrow art and disappear in off-screen and arrival modes.
@@ -1856,62 +1863,15 @@ NaowhForever_QoL/
 - It filters through `ChatFrameUtil.AddMessageEventFilter`: `ChatFrame_AddMessageEventFilter` is a deprecated
   shim Forever does not load. The filters are added only while it is on, and a secret message passes unread.
 
-### Layer Tracker
-- A layer is the server and zone copy parts of an NPC's GUID, `Creature-0-server-map-zoneUID-id-spawn`
-  (`Shared.LayerOf`): the same copy number on another server is another layer. The line shows the copy number,
-  so players on the same layer read the same one, and the server too when two layers seen in the zone share a
-  number (`Label`). Every zone has its own numbers, so the reading starts over on a zone change, and the layers
-  seen are listed per zone (`ZoneMap`: the zone a smaller map is in).
-- A layer is taken once two different NPCs agree (`pendingKey`, `pendingGuid`): one NPC across a zone border,
-  or the same NPC seen twice, cannot set it. Your target and mouseover can replace it that way; a new nameplate
-  only fills an empty reading, since nameplates show the zone across a border too.
-- `SHARD_TRANSFER` is the game moving you to another layer, the world refresh its own toast counts down
-  to, so the reading starts over there and on every loading screen. Instances have no layers: it hides inside.
-- The countdown is `GetEvictionTimeRemaining()` at `SHARD_TRANSFER_IMMINENT`, the same time the game's toast
-  counts from; its one-second ticker runs only until `SHARD_TRANSFER` or `SHARD_TRANSFER_CANCELLED`.
-- "You moved" is said only for the first confirmed reading after a `SHARD_TRANSFER` that differs from the one
-  before it, so mousing over NPCs never says it.
-- Only creature and vehicle GUIDs are read; a player's GUID has no zone copy in it. A GUID or nameplate unit
-  the game keeps secret is left unread (`issecretvalue`): `UnitGUID` refuses a secret unit from addon code.
-- The layers seen are this session's only, at most `SEEN_MAX` (12) per zone, the oldest dropped first. A layer
-  named in someone's swap request is listed as heard until you read it yourself.
-- `ns.Layers` is what the swaps (`LayerRequests.lua`) and Discovery's rare tooltips read: the current layer,
-  the zone, and noting a heard layer. The swaps fill in its `Asking`, `Click` and `AddTip`.
-
-### Layer Tracker swaps
-- Forever has no way to move you to a layer: you join the group of someone on it, and the game moves you
-  there (its own prompt, which Auto-Accept Layer Swap confirms). You keep that layer only while you stay in
-  the group.
-- A request is one visible line in the public `layer` channel, the line other layer addons on Forever already
-  answer: `inv layer <LS map not server-zoneUID>`, your zone and the layer you want to leave. A line in a
-  channel can only be sent from a click, so it is sent by the click on the line and never repeated; asking
-  again waits `ASK_GAP` (30 seconds). Hidden addon messages over a channel are not used: they are documented
-  as disabled on Classic, and their delivery between Forever clients is unverified.
-- The channel is joined `JOIN_DELAY` (10 seconds) after login or switching swaps on, never at login itself:
-  joined before the game's General and Trade it would take their channel numbers; a click before then waits for
-  that join. It is joined with `JoinTemporaryChannel` (kept through a reload, left at logout) and in no chat
-  window, so its lines are never shown. Switching swaps off leaves it only if this character joined it, which is
-  kept in `Shared.CharacterData` (`layerRequestsChannel`) so it survives a reload.
-- An ask ends after `ASK_TIME` (60 seconds) without an invite. A group joined while asking is the answer: if no
-  move starts within `CHECK_AFTER` (15 seconds), or the move is cancelled, the swap failed and Leave Failed
-  Swaps leaves the group (a host in another zone, or on your layer, cannot move you). A group a friend or
-  guildmate invited you into (`PARTY_INVITE_REQUEST`) is never left: it may be a group you wanted. A zone change
-  or loading screen ends an ask nobody has answered yet, since it named the old zone.
-- Another player's request shows a prompt with an Invite button (`Parts.Toast`), never an invite by itself:
-  only for your zone and a layer that is not yours, one at a time, at most once a minute per player
-  (`PROMPT_AGAIN`, a list of `ASKERS_MAX` names), and never in combat, an instance, a raid, while you ask, or
-  in a group you do not lead or that is full. Friends and guildmates are named as such. Turning requests off
-  takes the prompt away; a prompt still queued behind another toast hides itself if it shows after that.
-- `CHAT_MSG_CHANNEL` is read only while swaps are on, and only the `layer` channel's lines; a secret line,
-  name, GUID or channel name is left unread. Every request's layer is noted, even with Show Requests From
-  Others off.
-
 ### Invite Buttons
 - The list is in `ns.PROFILE_OWN`: a shared profile never carries your friends' BattleTags.
 - A Battle.net friend is kept by BattleTag: the game account ID to invite changes every session, so it
   is looked up on each click, the first of their game accounts online on Forever.
 - Battle.net friends are invited with `C_BattleNet.InviteFriend`, as the game's Friends list does: the
   legacy friend list is off on Forever, so a name invite only reaches characters the game can find.
+- A game account with realm ID 0 is skipped, as the Friends list does: it is still at character
+  select. Since build 71037 Forever gives addons 0 for every realm ID, so while `GetRealmID()` is 0 too
+  that test is dropped.
 - Invite All stops at a full party (`MAX_PARTY_MEMBERS`) and does not turn the party into a raid;
   people already in the group are skipped.
 - The invite buttons are plain buttons: invites are not protected, so they work in combat. Adding or

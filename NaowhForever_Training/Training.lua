@@ -34,7 +34,7 @@ end
 local function CharKey()
     if charKey then return charKey end
     local name = UnitName("player")
-    local key = name .. "-" .. GetRealmName()
+    local key = name .. "-" .. ns.RealmName()
     if name ~= UNKNOWNOBJECT then charKey = key end
     return key
 end
@@ -51,7 +51,7 @@ end
 
 local function Ignored()
     local all = Characters("trainingIgnored")
-    local key = CharKey()
+    local key = ns.CharKey(all)
     all[key] = all[key] or {}
     return all[key]
 end

@@ -1,72 +1,111 @@
--- TrinketBar.lua: the Trinket Bar, your two trinket slots, and its picker of trinkets in your bags.
+-- TrinketBar.lua: the Trinket Bar, your trinket slots (and your weapons or all your gear, if picked), and its picker of what fits a slot from your bags.
 local ns = _G.NaowhForever
 
 local S = ns.QoLSettings
 local T = ns.THEME
 local Parts = ns.Shared.Parts
+local Items = ns.Shared.Items
 local G = ns.GearSets
 local C, St, Look = G.C, G.Style, G.Look
-local TRINKET_SLOTS = C.TRINKET_SLOTS
+local TRINKET_SLOTS, BAR_SLOTS = C.TRINKET_SLOTS, C.BAR_SLOTS
+local Trinkets = G.Trinkets
 
 local PICKER_COLS, PICKER_CELL, PICKER_STEP, PICKER_PAD = 6, 36, 40, 6
 local PICKER_ROOM, PICKER_EDGE, PICKER_GAP = 34, 8, 5
 local CLOSE_W, CLOSE_H, CLOSE_Y = 80, 22, 5
+local RANK_SIZE, RANK_INSET = 12, 2
 local HOME_Y = -160
 local GCD = 1.5
-local ICON_INSET, BLACK = St.ICON_INSET, St.BLACK
-local TRINKET = "INVTYPE_TRINKET"
+local BLACK, EMPTY_ICON = St.BLACK, St.EMPTY_ICON
+local TRINKET_INDEX = { [TRINKET_SLOTS[1]] = 1, [TRINKET_SLOTS[2]] = 2 }
 local CARD = C.PAGE .. ":trinketBar"
 local WATCHED = { "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "PLAYER_EQUIPMENT_CHANGED" }
 
 local TEXT_NONE = ns.L("No spare trinkets in your bags.")
+local TEXT_NONE_SLOT = ns.L("Nothing in your bags fits that slot.")
 local TEXT_CLOSE = ns.L("Close")
-local TEXT_EMPTY = ns.L("Trinket %d - Empty")
+local TEXT_EMPTY = ns.L("%s - Empty")
+local TEXT_QUEUE_HINT = ns.L("Shift-click to add it to this slot's queue, or take it out.")
+local TEXT_PICKED = ns.L("%s goes on when combat ends.")
+local TEXT_UNPICKED = ns.L("Nothing will be swapped in when combat ends.")
 local TEXT_MOVER = "Trinkets"
 
 local trinkets, picker, moving
-local items, seen = {}, {}
+local items, seen, bySlot, shown = {}, {}, {}, {}
 local watcher = CreateFrame("Frame")
 
 local function ClosePicker()
     if picker then picker:Hide() end
 end
 
-local function InBags(itemID)
-    for bag = 0, NUM_BAG_SLOTS do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            if C_Container.GetContainerItemID(bag, slot) == itemID then return true end
-        end
-    end
-    return false
+local function Queueable(slot)
+    return S.Get("trinketQueue") == true and TRINKET_INDEX[slot] ~= nil
 end
 
-local function SpareTrinkets()
+local function Fitting(inventorySlot)
     wipe(items)
     wipe(seen)
-    for bag = 0, NUM_BAG_SLOTS do
+    local worn = Queueable(inventorySlot) and GetInventoryItemID("player", inventorySlot)
+    if worn then
+        seen[worn] = true
+        items[1] = worn
+    end
+    for bag = BACKPACK_CONTAINER, NUM_BAG_SLOTS do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local id = C_Container.GetContainerItemID(bag, slot)
-            if id and not seen[id] then
-                local _, _, _, equipLoc = C_Item.GetItemInfoInstant(id)
-                if equipLoc == TRINKET then
-                    seen[id] = true
-                    items[#items + 1] = id
-                end
+            if id and not seen[id] and Items.Fits(id, inventorySlot) then
+                seen[id] = true
+                items[#items + 1] = id
             end
         end
     end
     return items
 end
 
+local function ShowRank(button)
+    local rank = Queueable(button.inventorySlot) and Trinkets.Rank(button.inventorySlot, button.itemID)
+    button.rank:SetText(rank or "")
+end
+
+local function ShowPicks()
+    for slot, button in pairs(shown) do
+        local id = Trinkets.Picked(slot)
+        button.next.icon:SetTexture(id and C_Item.GetItemIconByID(id))
+        button.next:SetShown(id ~= nil)
+    end
+end
+
 local function OnPickClick(self)
-    if InCombatLockdown() then return end
-    if InBags(self.itemID) then C_Item.EquipItemByName(self.itemID, self.inventorySlot) end
+    local slot, id = self.inventorySlot, self.itemID
+    if Queueable(slot) and IsShiftKeyDown() then
+        Trinkets.Toggle(slot, id)
+        for _, button in ipairs(picker.buttons) do ShowRank(button) end
+        return
+    end
     ClosePicker()
+    if InCombatLockdown() then
+        if Trinkets.Picked(slot) == id or GetInventoryItemID("player", slot) == id then
+            Trinkets.Pick(slot, nil)
+            ns.Print(TEXT_UNPICKED)
+        else
+            Trinkets.Pick(slot, id)
+            ns.Print(TEXT_PICKED:format(select(2, C_Item.GetItemInfo(id))))
+        end
+        return ShowPicks()
+    end
+    if Trinkets.Picked(slot) then
+        Trinkets.Pick(slot, nil)
+        ShowPicks()
+    end
+    if Trinkets.InBags(id) then C_Item.EquipItemByName(id, slot) end
 end
 
 local function OnPickEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetItemByID(self.itemID)
+    if Queueable(self.inventorySlot) then
+        GameTooltip:AddLine(TEXT_QUEUE_HINT, St.HINT_RGB.r, St.HINT_RGB.g, St.HINT_RGB.b, true)
+    end
     GameTooltip:Show()
 end
 
@@ -93,6 +132,8 @@ local function PickButton(i)
     button.icon = button:CreateTexture(nil, "ARTWORK")
     button.icon:SetAllPoints()
     ns.Border(button, BLACK)
+    button.rank = ns.Font(button, RANK_SIZE, "OUTLINE", T.fg)
+    button.rank:SetPoint("TOPLEFT", RANK_INSET, -RANK_INSET)
     button:SetScript("OnClick", OnPickClick)
     Parts.Press(button)
     button:SetScript("OnEnter", OnPickEnter)
@@ -102,15 +143,15 @@ local function PickButton(i)
 end
 
 local function Choose(anchor, inventorySlot)
-    if InCombatLockdown() then return end
     ClosePicker()
     if not picker then NewPicker() end
-    local spare = SpareTrinkets()
-    if #spare == 0 then ns.Print(TEXT_NONE) return end
+    local spare = Fitting(inventorySlot)
+    if #spare == 0 then return ns.Print(TRINKET_INDEX[inventorySlot] and TEXT_NONE or TEXT_NONE_SLOT) end
     for i, id in ipairs(spare) do
         local button = PickButton(i)
         button.itemID, button.inventorySlot = id, inventorySlot
         button.icon:SetTexture(C_Item.GetItemIconByID(id))
+        ShowRank(button)
         button:ClearAllPoints()
         button:SetPoint("TOPLEFT", PICKER_PAD + ((i - 1) % PICKER_COLS) * PICKER_STEP,
             -PICKER_PAD - math.floor((i - 1) / PICKER_COLS) * PICKER_STEP)
@@ -126,34 +167,46 @@ end
 
 local function OnSlotEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    if GetInventoryItemID("player", self.trinketSlot) then
-        GameTooltip:SetInventoryItem("player", self.trinketSlot)
+    if GetInventoryItemID("player", self.inventorySlot) then
+        GameTooltip:SetInventoryItem("player", self.inventorySlot)
     else
-        GameTooltip:SetText(TEXT_EMPTY:format(self.trinketIndex))
+        GameTooltip:SetText(TEXT_EMPTY:format(Items.SlotName(self.inventorySlot)))
     end
     GameTooltip:Show()
 end
 
 local function OnSlotPostClick(self, mouse, down)
-    if mouse == "RightButton" and not down then Choose(self, self.trinketSlot) end
+    if mouse == "RightButton" and not down then Choose(self, self.inventorySlot) end
 end
 
-local function NewSlot(i)
-    local slot = TRINKET_SLOTS[i]
-    local button = CreateFrame("Button", "NaowhForeverTrinket" .. i, trinkets, "SecureActionButtonTemplate")
+local function NewSlot(slot)
+    local i = TRINKET_INDEX[slot]
+    local button
+    if i then
+        button = CreateFrame("Button", "NaowhForeverTrinket" .. i, trinkets, "SecureActionButtonTemplate")
+    else
+        button = CreateFrame("Button", "NaowhForeverGearSlot" .. slot, trinkets, "SecureActionButtonTemplate")
+    end
     button:RegisterForClicks("AnyUp", "AnyDown")
     Parts.Press(button)
     button:SetAttribute("item1", tostring(slot))
-    button.icon = button:CreateTexture(nil, "ARTWORK")
-    ns.PixelInset(button.icon, ICON_INSET)
-    ns.Border(button, BLACK)
+    button.icon = Look.Dress(button)
     button.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
     button.cooldown:SetAllPoints(button.icon)
     button.cooldown:SetDrawEdge(false)
-    button.trinketSlot, button.trinketIndex = slot, i
+    button.next = CreateFrame("Frame", nil, button)
+    button.next:SetFrameLevel(button.cooldown:GetFrameLevel() + 1)
+    button.next:SetPoint("TOPLEFT", button, "CENTER")
+    button.next:SetPoint("BOTTOMRIGHT")
+    button.next.icon = button.next:CreateTexture(nil, "ARTWORK")
+    button.next.icon:SetAllPoints()
+    ns.Border(button.next, BLACK)
+    button.next:Hide()
+    button.inventorySlot = slot
     button:SetScript("PostClick", OnSlotPostClick)
     button:SetScript("OnEnter", OnSlotEnter)
     button:SetScript("OnLeave", HideTooltip)
+    bySlot[slot] = button
     return button
 end
 
@@ -166,8 +219,21 @@ local function BuildTrinkets()
     trinkets:SetMovable(true)
     trinkets:SetClampedToScreen(true)
     trinkets.buttons = {}
-    for i = 1, #TRINKET_SLOTS do trinkets.buttons[i] = NewSlot(i) end
     trinkets.mover = ns.UI.AttachMover(trinkets, TEXT_MOVER, SavePosition, C.PAGE, CARD)
+end
+
+local function PickSlots()
+    wipe(trinkets.buttons)
+    wipe(shown)
+    for _, slot in ipairs(BAR_SLOTS[S.Get("trinketSlots")] or TRINKET_SLOTS) do
+        local button = bySlot[slot] or NewSlot(slot)
+        trinkets.buttons[#trinkets.buttons + 1] = button
+        shown[slot] = button
+        button:Show()
+    end
+    for slot, button in pairs(bySlot) do
+        if not shown[slot] then button:Hide() end
+    end
 end
 
 local function Place()
@@ -182,8 +248,8 @@ end
 
 local function ShowCooldowns()
     local on = S.Get("trinketCooldown")
-    for i, button in ipairs(trinkets.buttons) do
-        local start, duration, enable = GetInventoryItemCooldown("player", TRINKET_SLOTS[i])
+    for _, button in ipairs(trinkets.buttons) do
+        local start, duration, enable = GetInventoryItemCooldown("player", button.inventorySlot)
         if not on then
             button.cooldown:Hide()
         elseif not (issecretvalue and (issecretvalue(start) or issecretvalue(duration) or issecretvalue(enable))) then
@@ -217,13 +283,16 @@ local function ApplyTrinkets()
         return
     end
     if not trinkets then BuildTrinkets() end
+    PickSlots()
     Place()
-    Look.Trinkets(trinkets, trinkets.buttons, S.Get("trinketSize"), S.Get("trinketSpacing"), S.Get("trinketGrow"))
-    for i, button in ipairs(trinkets.buttons) do
-        button:SetAttribute("type1", GetInventoryItemID("player", TRINKET_SLOTS[i]) and "item" or nil)
+    Look.Trinkets(trinkets, trinkets.buttons, S.Get("trinketSize"), S.Get("trinketSpacing"), S.Get("trinketGrow"),
+        S.Get("trinketSquare"))
+    for _, button in ipairs(trinkets.buttons) do
+        button:SetAttribute("type1", GetInventoryItemID("player", button.inventorySlot) and "item" or nil)
         button.cooldown:SetHideCountdownNumbers(not S.Get("trinketCountdown"))
     end
     ShowCooldowns()
+    ShowPicks()
     trinkets.mover:SetShown(moving == true)
     trinkets:Show()
 end
@@ -233,7 +302,10 @@ local function OnEvent(_, event, slot)
         ClosePicker()
     elseif event == "BAG_UPDATE_COOLDOWN" then
         ShowCooldowns()
-    elseif event ~= "PLAYER_EQUIPMENT_CHANGED" or slot == TRINKET_SLOTS[1] or slot == TRINKET_SLOTS[2] then
+    elseif event ~= "PLAYER_EQUIPMENT_CHANGED" then
+        ApplyTrinkets()
+    elseif shown[slot] then
+        if InCombatLockdown() then shown[slot].icon:SetTexture(GetInventoryItemTexture("player", slot) or EMPTY_ICON) end
         ApplyTrinkets()
     end
 end
@@ -255,6 +327,7 @@ end
 watcher:RegisterEvent("PLAYER_LOGIN")
 watcher:SetScript("OnEvent", OnEvent)
 hooksecurefunc(S, "Set", OnSet)
+hooksecurefunc(Trinkets, "Clear", ShowPicks)
 ns.OnApply(ApplyTrinkets)
 hooksecurefunc(ns, "ShowUnlockMode", OnUnlock)
 hooksecurefunc(ns, "HideUnlockMode", OnLock)

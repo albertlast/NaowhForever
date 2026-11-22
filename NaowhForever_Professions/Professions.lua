@@ -5,7 +5,7 @@ local F = ns.FEATURES.professions
 
 local S = ns.UI.ModuleSettings("professions", {
     enabled = F.enabled,
-    skillThresholds = F.skillThresholds, skillUpChances = F.skillUpChances, sortSkillUps = false,
+    skillThresholds = F.skillThresholds, skillUpChances = F.skillUpChances, sortSkillUps = false, sortProfit = false,
     skillUpPlan = F.skillUpPlan, skillUpPlanLater = false, skillUpPlanBest = false,
     learnedRecipeVendors = F.learnedRecipeVendors,
     recipeFinder = F.recipeFinder, rankAlert = F.rankAlert, bagReagents = F.bagReagents,
@@ -59,7 +59,7 @@ ns.OnApply(SplitTooltipCharacters)
 local temporary = {}
 
 local function LegacyKey()
-    local name, realm = UnitName("player"), GetRealmName()
+    local name, realm = UnitName("player"), ns.RealmName()
     if not name or name == _G.UNKNOWNOBJECT or not realm then return end
     return name .. "-" .. realm
 end

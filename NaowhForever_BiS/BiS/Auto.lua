@@ -51,7 +51,7 @@ local function Gather(spec)
     wipe(pool)
     wipe(simRank)
     for i, id in ipairs(spec.trinkets or NONE) do
-        pool[id], simRank[id] = true, i
+        if not R.OtherSideQuest(id) then pool[id], simRank[id] = true, i end
     end
     for _, gear in ipairs(Items.GEAR_SLOTS) do
         AddAll(R.Candidates(gear[1], spec))
@@ -170,6 +170,8 @@ function Auto.Build(spec)
         local before = AFTER[slot] and chosen[AFTER[slot]][1]
         chosen[slot] = Take(ranked[slot], before, chosen[slot] or {})
     end
+    local main = chosen[MAIN_HAND][1]
+    if main and Items.IsTwoHand(main) then wipe(chosen[OFF_HAND]) end
     Listen()
     return chosen, waiting
 end

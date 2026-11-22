@@ -22,8 +22,6 @@
     <Script file="Questing\GroupButtons.lua"/>
     <Script file="Questing\FreeForAll.lua"/>
     <Script file="Questing\LayerSwap.lua"/>
-    <Script file="Questing\LayerTracker.lua"/>
-    <Script file="Questing\LayerRequests.lua"/>
     <Script file="Questing\QuestProgress.lua"/>
     <Script file="Questing\QuestLinks.lua"/>
     <Script file="Questing\QuestItems.lua"/>
@@ -81,6 +79,7 @@
     <Script file="Loot\BagSpaceIgnore.lua"/>
     <Script file="Loot\ScrapMarker.lua"/>
     <Script file="Loot\BankMarker.lua"/>
+    <Script file="Loot\BagCleanup.lua"/>
     <Script file="Loot\ScrapList.lua"/>
     <Script file="Loot\Alts.lua"/>
     <Script file="Loot\Mail.lua"/>

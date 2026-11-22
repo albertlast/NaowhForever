@@ -93,6 +93,7 @@ NaowhForever_Professions/
     ReagentsWindow.lua the Reagents window and its title bar button (ns.ToggleReagents)
     Alts.lua           the Alts title bar button and its menu of your other characters' professions
     Link.lua           the Link title bar button and its menu that posts your profession's trade link in chat
+    Tsm.lua            the TSM title bar button, shown with TradeSkillMaster loaded, that switches to TSM's crafting window
     CraftQueue.lua     the standalone Crafting Queue window (ns.ToggleCraftQueue)
     TrainFavorites.lua Train Favorites beside the trainer
     FavoriteMarks.lua  stars beside favorite unlearned recipes at trainers and merchants
@@ -193,6 +194,17 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   the plan and a loss on the recipe, with nothing saying why. A recipe with an unpriced reagent, or
   a result whose sell price has not loaded yet, comes after the priced ones, by chance. The cost is cached
   per recipe with the profit, until the next full draw. The unlearned groups keep their own order.
+- Highest Profit is the Filter menu's third sort, offered with Crafting Profit and Profit in Recipe List
+  on and a price scan to read. It lists every learned recipe in one group, without categories, by the
+  profit the list shows, highest first; the ones whose profit is not known (no scan price for the
+  result, or a reagent unpriced) come after, by name. Nothing is left out: Profitable in Filter does
+  that. It shares Best for Skill-ups' loop and scratch tables (`AddSorted` in Entries.lua), so it adds
+  no garbage to a draw. Its choice is kept per profession as `sortProfit` beside `sortSkillUps`;
+  choosing one sort clears the other, and with Crafting Profit or Profit in Recipe List off the list
+  falls back to its categories.
+- A learned recipe's profit in the list counts every item one craft makes, as the Profitable filter and the
+  unlearned rows already did. It used to count one: profits are cached per recipe, so a recipe that makes
+  several showed whichever of the two was asked for first.
 - Plan by Best Sale Price (off by default) changes only the Skill-up Plan's cost: the result counts at the
   best of its vendor sale, its auction price after the cut and its disenchant value after the cut. Best for
   Skill-ups and the per skill-up line keep the vendor sale, so a setting found under the plan does not
@@ -262,6 +274,11 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   ours. The settings card names the ones known to do that (SkillUp Forever, AllTheThings) when they are
   loaded and says to turn Professions off to use them. Their frames are laid out for Blizzard's window,
   so they are not shown over ours.
+- TradeSkillMaster's TSM button is one of those, so our title bar has its own TSM button (Tsm.lua), which
+  runs TSM's `/tsm crafting`. Ours is hidden before that runs: TSM moves Blizzard's window off screen,
+  and our SetPoint hook on it would otherwise drag it back to our window. While
+  `TSM_API.IsUIVisible("CRAFTING")` is true ours stays out of the way, and TSM's UI callback brings ours
+  back when its Default UI button puts Blizzard's window back.
 - Blizzard's profession tabs switch profession by casting its spell, which only Blizzard's code may
   do, so the real tabs move onto our window's right edge, or its left edge with Dock Shopping List on,
   and ignore their invisible parent's alpha.
@@ -399,7 +416,8 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   while none is ticked. With Unlearned Recipes off they neither filter nor count on the Filter button.
 - The Filter menu's choices and its sort are kept per profession (`professionFilters`, by profession ID), so
   Blacksmithing's do not carry into Cooking; Reset clears the open profession's alone. A profession's first
-  open starts from the shared `filter*` and `sortSkillUps` settings, so filters ticked before stay ticked.
+  open starts from the shared `filter*`, `sortSkillUps` and `sortProfit` settings, so filters ticked before
+  stay ticked.
   Show ROI and Unlearned Recipes stay shared.
 - Your Auctions is opt-in. It reads the owner list only while the auction house is open, keeps the
   latest active item quantities under the character's GUID, as the Shopping List does, and

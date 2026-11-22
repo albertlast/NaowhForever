@@ -146,6 +146,7 @@ local function Fixture()
             ShowWidgetTooltip = function(_, text) state.tip = text end,
             HideWidgetTooltip = NOTHING },
         AccountSettings = function() return state.account end,
+        CharKey = function() return "Die Man-Realm" end,
         Print = function(text) state.printed[#state.printed + 1] = text end,
         GamepadStandDown = function() return false end,
         GamepadOwnsPanels = function() return false end,
@@ -670,6 +671,12 @@ end
 copied = nil
 B.Sources.Go(lookup)
 check("nothing better known: its Wowhead link to copy", lookup and copied and copied:find("item=" .. lookup, 1, true))
+local worldDrop
+for id in pairs(ns.BiSWorldDrops) do
+    if ns.BiSSource(id) == "World drop" then worldDrop = id break end
+end
+check("an item no data knows says so, not World drop", B.View.Cells.Meta(999001, 60) == "Source unknown"
+    and B.View.Cells.Meta(worldDrop, 60):find("World drop", 1, true) ~= nil)
 view:Toggle(1)
 check("and folds away", view.pools.backup.used == 0)
 
@@ -951,6 +958,31 @@ do
     ns.DeleteBisList()
     ns.SelectBisList(mine.id)
     check("the list page shows your own list again", view.page == "list" and B.Lists.List() == mine)
+end
+do
+    local function Tabs()
+        local keys = {}
+        for i = 1, #window.pages.buttons do
+            if window.pages.buttons[i]:IsShown() then keys[#keys + 1] = window.pages.buttons[i].key end
+        end
+        return table.concat(keys, ",")
+    end
+    S.Set("bisRoute", true)
+    check("Route Page on, a Route tab follows Quests", Tabs() == "list,quests,route")
+    window.pages.onPick("route")
+    local route = view.route
+    check("its page starts at the next stop, one row a step, without the list's summary", view.page == "route"
+        and SectionIn(view, "Next stop") and #route > 1 and view.pools.place.used == #route
+        and not view.summary:IsShown())
+    local moved, row = route[1].name, view.pools.place[1]
+    check("the first step can only go later", not row.up:IsShown() and row.down:IsShown())
+    row.down.scripts.OnClick(row.down)
+    check("and Go here later moves it down", view.page == "route" and B.Lists.List().route[2] == moved
+        and view.route[2].name == moved)
+    S.Set("bisRoute", false)
+    check("turned off, the tab goes and Your List shows", Tabs() == "list,quests" and view.page == "list"
+        and window.pages.shown == "list")
+    B.Lists.List().route = nil
 end
 place = view.pools.place[1]
 place.dungeon, place.map, place.spot = nil, 1413, nil

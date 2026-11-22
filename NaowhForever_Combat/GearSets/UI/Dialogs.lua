@@ -168,6 +168,14 @@ function ns.RenameGearSet(setID, name)
         for _, key in ipairs(G.SWAP_KEYS) do
             if S.Get(key) == name then S.Set(key, newName) end
         end
+        local forms = CopyTable(S.Get("gearForms"))
+        for spellID, setName in pairs(forms) do
+            if setName == name then forms[spellID] = newName end
+        end
+        S.Set("gearForms", forms)
+        local looks = CopyTable(S.Get("gearLooks"))
+        looks[newName], looks[name] = looks[name], nil
+        S.Set("gearLooks", looks)
     end)
 end
 
@@ -180,5 +188,10 @@ end
 function ns.DeleteGearSet(setID, name)
     ns.Confirm(TEXT_DELETE:format(name), function()
         C_EquipmentSet.DeleteEquipmentSet(setID)
+        if S.Get("gearLooks")[name] then
+            local looks = CopyTable(S.Get("gearLooks"))
+            looks[name] = nil
+            S.Set("gearLooks", looks)
+        end
     end)
 end

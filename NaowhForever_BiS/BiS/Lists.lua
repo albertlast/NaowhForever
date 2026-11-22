@@ -7,6 +7,7 @@ local R = B.Rankings
 local Items = ns.Shared.Items
 local SLOT_NAME = Items.SLOT_NAME
 local Picks, Store = B.Picks, B.Store
+local REPLACED = ns.Shared.Replaced
 
 local NAME_MAX = C.NAME_MAX
 local TEXT_DEFAULT_NAME = "My BiS"
@@ -23,6 +24,7 @@ local NONE = {}
 
 local lookup
 local before = {}
+local forever = setmetatable({}, { __mode = "k" })
 
 local function ClassLists()
     local account = ns.AccountSettings()
@@ -82,7 +84,11 @@ local function FreeName(store, name)
 end
 
 local function CharKey()
-    return UnitName("player") .. "-" .. GetRealmName()
+    local account = ns.AccountSettings()
+    ns.CharKey(account.bis)
+    ns.CharKey(account.bisActive)
+    ns.CharKey(account.bisClassActive)
+    return ns.CharKey(account.bisSpecActive)
 end
 
 local function Use(list)
@@ -142,6 +148,24 @@ local function RankOldPicks(list)
     end
 end
 
+local function UseForeverItems(list)
+    if forever[list] then return end
+    forever[list] = true
+    for _, gear in ipairs(Items.GEAR_SLOTS) do
+        local out, seen, changed = {}, {}, false
+        for _, id in ipairs(Picks(list, gear[1])) do
+            local new = REPLACED[id]
+            changed = changed or new ~= nil
+            id = new or id
+            if not seen[id] then
+                seen[id] = true
+                out[#out + 1] = id
+            end
+        end
+        if changed then Store(list, gear[1], out) end
+    end
+end
+
 local function List()
     local store, account = ClassLists()
     local key = CharKey()
@@ -151,6 +175,7 @@ local function List()
     list.extra = list.extra or {}
     if not list.slots then SlotItems(list) end
     RankOldPicks(list)
+    UseForeverItems(list)
     return list
 end
 
@@ -166,23 +191,23 @@ local function SwapPicks(list, key)
         return list
     end
     list.bySpec = list.bySpec or {}
-    if previous then list.bySpec[previous] = { slots = list.slots, extra = list.extra } end
+    if previous then list.bySpec[previous] = { slots = list.slots, extra = list.extra, route = list.route } end
     local picks = list.bySpec[key] or { slots = {}, extra = {} }
-    list.slots, list.extra, list.spec = picks.slots, picks.extra, key
+    list.slots, list.extra, list.route, list.spec = picks.slots, picks.extra, picks.route, key
     return list
 end
 
 local function PicksOn(list, key)
-    if key == ShownSpec(list) then return list.slots, list.extra or NONE end
+    if key == ShownSpec(list) then return list.slots, list.extra or NONE, list.route end
     local parked = list.bySpec and list.bySpec[key]
-    if parked then return parked.slots or NONE, parked.extra or NONE end
+    if parked then return parked.slots or NONE, parked.extra or NONE, parked.route end
 end
 
 local function Copied(from)
     local slots, extra = {}, {}
     local source = FindList((ClassLists()), from.id)
-    local picked, more = nil, nil
-    if source then picked, more = PicksOn(source, from.spec) end
+    local picked, more, route = nil, nil, nil
+    if source then picked, more, route = PicksOn(source, from.spec) end
     if not picked then return slots, extra end
     for slot in pairs(from.slots) do
         if picked[slot] then
@@ -190,7 +215,7 @@ local function Copied(from)
             if more[slot] then extra[slot] = { unpack(more[slot]) } end
         end
     end
-    return slots, extra
+    return slots, extra, route and { unpack(route) }
 end
 
 local function SwitchSpec(key)
@@ -309,9 +334,9 @@ function L.PicksOn(id, key)
     if list then return PicksOn(list, key) end
 end
 
-function L.AddList(name, spec, slots, extra, specOnly)
+function L.AddList(name, spec, slots, extra, specOnly, route)
     local store = ClassLists()
-    local list = AddList(store, { name = FreeName(store, name), spec = spec, slots = slots, extra = extra,
+    local list = AddList(store, { name = FreeName(store, name), spec = spec, slots = slots, extra = extra, route = route,
         specOnly = specOnly == true and SpecOf(spec) ~= nil or nil })
     Use(list)
     Changed()
@@ -382,9 +407,9 @@ function ns.NewBisList(name, specOnly, from)
     if not name then return false, TEXT_NAME_EMPTY end
     if Taken((ClassLists()), name) then return false, TEXT_NAME_TAKEN end
     local current = L.CurrentSpec()
-    local slots, extra = {}, {}
-    if from then slots, extra = Copied(from) end
-    L.AddList(name, current and current.key, slots, extra, specOnly)
+    local slots, extra, route = {}, {}, nil
+    if from then slots, extra, route = Copied(from) end
+    L.AddList(name, current and current.key, slots, extra, specOnly, route)
     return true
 end
 
@@ -475,5 +500,22 @@ end
 function ns.RemoveBisItem(itemID)
     local list = List()
     for slot in pairs(SLOT_NAME) do Edit(list, slot, Drop, itemID) end
+    Changed()
+end
+
+function ns.MoveBisRouteStep(places, index, step)
+    local other = places[index + step]
+    if not (places[index] and other) then return end
+    local list, route, seen = List(), {}, {}
+    for i, place in ipairs(places) do
+        local name = (i == index and other or i == index + step and places[index] or place).name
+        route[i], seen[name] = name, true
+    end
+    for _, name in ipairs(list.route or NONE) do
+        if not seen[name] then
+            route[#route + 1], seen[name] = name, true
+        end
+    end
+    list.route = route
     Changed()
 end
