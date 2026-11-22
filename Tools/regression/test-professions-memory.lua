@@ -249,7 +249,7 @@ function api.Build(data)
             slots[k] = { reagents = { { itemID = item } }, quantityRequired = k, required = true }
         end
         schematic[r.spell] = { reagentSlotSchematics = slots, outputItemID = r.item or (60000 + i),
-            quantityMin = 1 }
+            quantityMin = i % 5 == 0 and 2 or 1 }
     end
     -- The recipe chosen when the window opens (the first of the first category) takes the
     -- item that never loads.
@@ -812,16 +812,37 @@ settings.skillUpChances = nil
 Redraw()
 check("off, the rows show no chance", RecipeRows()[1].chance.shown == false)
 
+-- A recipe that makes several items shows the whole craft's profit in its row.
+do
+    local Prices, Recipes = ns.Professions.Prices, ns.Professions.Recipes
+    Redraw()
+    local shown = {}
+    for _, row in ipairs(RecipeRows()) do
+        local id = row.entry.recipe.recipeID
+        local output, yield = Recipes.OutputItem(id)
+        if yield > 1 then shown[id] = Prices.RecipeProfit(id, output) end
+    end
+    Prices.ClearCache()
+    local checked, same = 0, true
+    for id, profit in pairs(shown) do
+        checked = checked + 1
+        if profit ~= Prices.RecipeProfit(id, Recipes.OutputItem(id)) then same = false end
+    end
+    check("a row's profit counts every item a craft makes", checked > 0 and same)
+end
+
 -- Highest Profit: one list of every learned recipe, the best profit first, the unknown after.
 do
     local Prices, Recipes, ProfEntries = ns.Professions.Prices, ns.Professions.Recipes, ns.Professions.Entries
     local learnedTotal = 0
     for _, cat in ipairs(ProfEntries.Learned()) do learnedTotal = learnedTotal + #cat.recipes end
+    local price = ns.AuctionPrice
+    ns.AuctionPrice = function(id) if id % 4 ~= 0 then return price(id) end end
     ns.Professions.Filters.Set("sortProfit", true)
     Redraw()
     local rows = ProfEntries.list
     check("the profit sort heads its list Highest Profit", rows[1].cat and rows[1].cat.name == "Highest Profit")
-    local last, byProfit, known, unknown, pastKnown = math.huge, true, 0, 0, false
+    local last, lastName, byProfit, byName, known, unknown, pastKnown = math.huge, nil, true, true, 0, 0, false
     for i = 2, #rows do
         local info = rows[i].recipe
         if not info then break end
@@ -829,19 +850,28 @@ do
         if profit then
             known = known + 1
             if pastKnown or profit > last then byProfit = false end
+            if profit == last and info.name < lastName then byName = false end
             last = profit
         else
+            if pastKnown and info.name < lastName then byName = false end
             unknown = unknown + 1
             pastKnown = true
         end
+        lastName = info.name
     end
     check("the profit sort lists the highest profit first, the unknown after", byProfit and known > 1)
+    check("and lists equal and unknown profits by name", byName and unknown > 1)
     check("and lists every learned recipe in it, with no category rows", known + unknown == learnedTotal)
+    ns.AuctionPrice = price
     Report("full redraw sorted by profit", Redraw, 4, 0.05)
     settings.craftProfit = false
     Redraw()
     check("with Crafting Profit off the list goes back to its categories", rows[1].cat.name == "Learned")
     settings.craftProfit = true
+    settings.craftProfitList = false
+    Redraw()
+    check("with Profit in Recipe List off the list goes back to its categories", rows[1].cat.name == "Learned")
+    settings.craftProfitList = true
     ns.Professions.Filters.Set("sortProfit", false)
     Redraw()
     check("By Category lists it by category again", rows[1].cat.name == "Learned")

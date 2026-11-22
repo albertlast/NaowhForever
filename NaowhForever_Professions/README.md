@@ -193,13 +193,14 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   the plan and a loss on the recipe, with nothing saying why. A recipe with an unpriced reagent, or
   a result whose sell price has not loaded yet, comes after the priced ones, by chance. The cost is cached
   per recipe with the profit, until the next full draw. The unlearned groups keep their own order.
-- Highest Profit is the Filter menu's third sort, offered with Crafting Profit on and a price scan to read.
-  It lists every learned recipe in one group, without categories, by the profit the list shows, highest
-  first; the ones whose profit is not known (no scan price for the result, or a reagent unpriced) come
-  after, by name. Nothing is left out: Profitable in Filter does that. It shares Best for Skill-ups' loop
-  and scratch tables (`AddSorted` in Entries.lua), so it adds no garbage to a draw. Its choice is kept
-  per profession as `sortProfit` beside `sortSkillUps`; choosing one sort clears the other, and with
-  Crafting Profit off the list falls back to its categories.
+- Highest Profit is the Filter menu's third sort, offered with Crafting Profit and Profit in Recipe List
+  on and a price scan to read. It lists every learned recipe in one group, without categories, by the
+  profit the list shows, highest first; the ones whose profit is not known (no scan price for the
+  result, or a reagent unpriced) come after, by name. Nothing is left out: Profitable in Filter does
+  that. It shares Best for Skill-ups' loop and scratch tables (`AddSorted` in Entries.lua), so it adds
+  no garbage to a draw. Its choice is kept per profession as `sortProfit` beside `sortSkillUps`;
+  choosing one sort clears the other, and with Crafting Profit or Profit in Recipe List off the list
+  falls back to its categories.
 - A learned recipe's profit in the list counts every item one craft makes, as the Profitable filter and the
   unlearned rows already did. It used to count one: profits are cached per recipe, so a recipe that makes
   several showed whichever of the two was asked for first.

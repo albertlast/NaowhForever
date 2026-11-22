@@ -177,7 +177,7 @@ local function SortSkillUps()
 end
 
 local function SortProfit()
-    return S.Get("craftProfit") and not W.linked and Filters.Get("sortProfit") and Prices.ProfitShown()
+    return S.Get("craftProfit") and S.Get("craftProfitList") and not W.linked and Filters.Get("sortProfit") and Prices.ProfitShown()
 end
 
 local function KeepSkillUp(info)

@@ -161,7 +161,7 @@ local function AddFilter(root, f)
 end
 
 local function Sort()
-    if Filters.Get("sortProfit") and Prices.ProfitShown() then return SORT_PROFIT end
+    if Filters.Get("sortProfit") and S.Get("craftProfitList") and Prices.ProfitShown() then return SORT_PROFIT end
     if Filters.Get("sortSkillUps") and S.Get("skillUpChances") then return SORT_SKILL_UPS end
     return SORT_CATEGORIES
 end
@@ -177,7 +177,7 @@ local function SortBy(sort)
 end
 
 local function SortMenu(root)
-    local skillUps, profit = S.Get("skillUpChances"), S.Get("craftProfit")
+    local skillUps, profit = S.Get("skillUpChances"), S.Get("craftProfit") and S.Get("craftProfitList")
     if W.linked or not (skillUps or profit) then return end
     root:CreateTitle(TEXT_SORT)
     root:CreateRadio(TEXT_SORT_CATEGORIES, SortIs, SortBy, SORT_CATEGORIES)
