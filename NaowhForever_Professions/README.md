@@ -619,16 +619,30 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   It is built only while the setting is on and a matching merchant is open. Buying is click-driven unless
   Buy Vendor Items Automatically is on; merchant stack sizes and limited stock are respected, and the
   close button dismisses it until another merchant opens.
-- Buy Vendor Items Automatically (`shoppingVendorAuto`) is off by default and needs Vendor Items on
-  Shopping List. A real `MERCHANT_SHOW` arms it; the first time that merchant sells something on Buy from
-  Vendor it runs the same Buy All, and the visit is spent whatever the result. Like Restock, it does not
-  ask whether `MerchantFrame` is shown: `MERCHANT_SHOW` can reach this frame before the game's, so that
-  check skipped the buy in game whenever no `MERCHANT_UPDATE` followed. So a refusal (not enough
-  gold for all of it, full bags) is printed once, not on every `MERCHANT_UPDATE`, and buying the rest by
-  hand never sets off another round. A merchant that sells nothing on the list stays armed until it
-  closes, as its item data can arrive with a later update. Apply replaying `MERCHANT_SHOW` for a merchant
-  already open never arms it, so changing a setting beside a merchant buys nothing; turning Vendor Items
-  on Shopping List off spends the visit.
+- Buy Vendor Items Automatically (`shoppingVendorAuto`) is off by default. It needs Vendor Items on
+  Shopping List and registers nothing of its own.
+- A real `MERCHANT_SHOW` arms it. The first time that merchant sells something on Buy from Vendor, it buys
+  it as Buy All would. The visit is then spent, whatever the result.
+- So a refusal (gold for all of it, full bags) is printed once, not on every `MERCHANT_UPDATE`.
+- A merchant that sells nothing on the list stays armed until it closes. Its item data can come with a
+  later update.
+- Apply replays `MERCHANT_SHOW` for a merchant already open, with `replay` set, and that never arms it.
+  So changing a setting beside a merchant buys nothing. Turning Vendor Items on Shopping List off spends
+  the visit.
+- It does not ask whether `MerchantFrame` is shown, as QoL's Restock (`NaowhForever_QoL/Loot/Restock.lua`)
+  does not. `MERCHANT_SHOW` can reach this frame before the game's. That check skipped the buy in game
+  whenever no `MERCHANT_UPDATE` followed.
+- Nobody sees the list before it buys, so it takes off what you carry that the list has not counted yet.
+  That is your bags (`R.ItemCount`) less what the list bought (`profShopHave`) and less what the Crafting
+  Queue took from your bags (each craft's `got`). Both are already off the list's need, so taking off all
+  you carry would count them twice and never buy the rest. The bank does not count: a craft needs it in
+  your bags. Buy and Buy All still buy what the list shows.
+- A merchant closed right after buying (Esc) keeps counting the purchase for `CLOSE_SETTLE` seconds.
+  Otherwise it would never reach the list, and the next merchant would buy it again. A merchant opened
+  again in that time waits for it to land, then buys what is still missing.
+- Only a refusal clears the wait before the purchase lands: `ERR_INV_FULL`, `ERR_BAG_FULL`,
+  `ERR_ITEM_MAX_COUNT` or `ERR_NOT_ENOUGH_MONEY` (`REFUSALS`). Any other UI error, such as a spell's,
+  used to clear it, and that let Buy All buy a purchase still on its way a second time.
 - A vendor material's pin uses the shared waypoint system. Its built-in seller index is generated from
   Wowhead Classic's unlimited-stock inventories and matched to the Forever-adjusted NPC positions already
   in `Shared/Game/Towns.lua`; it has no runtime addon dependency. Merchant visits add to that

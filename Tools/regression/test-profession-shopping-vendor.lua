@@ -9,6 +9,8 @@ local settings, applyHooks = {}, {}
 local merchantShown = false
 local purchases, messages, drops = {}, {}, {}
 local bags, freeSlots, money = {}, 10, 10000
+local have, crafts, inFlight = {}, {}, {}
+local timers, now = {}, 0
 local redraws, viewEvents = 0, 0
 local vendorName, vendorMap, vendorX, vendorY = "Far Supplies", 10, 0.8, 0.8
 local playerMap, playerX, playerY = 10, 0.1, 0.1
@@ -42,9 +44,21 @@ end
 function frameMethods.SetScript(frame, name, fn) frame.scripts[name] = fn end
 local frameMeta = { __index = function(_, key) return frameMethods[key] or Noop end }
 
-local function Fire(event)
+local function Fire(event, ...)
     local frame = registry[event]
-    if frame then frame.scripts.OnEvent(frame, event) end
+    if frame then frame.scripts.OnEvent(frame, event, ...) end
+end
+
+local function Advance(seconds)
+    now = now + seconds
+    local due = {}
+    for i = #timers, 1, -1 do
+        if timers[i].at <= now then
+            due[#due + 1] = timers[i].fn
+            table.remove(timers, i)
+        end
+    end
+    for i = #due, 1, -1 do due[i]() end
 end
 
 local ns = {
@@ -102,6 +116,7 @@ local env = setmetatable({
         end,
     },
     C_Container = { CalculateTotalNumberOfFreeBagSlots = function() return freeSlots end },
+    C_Timer = { After = function(delay, fn) timers[#timers + 1] = { at = now + delay, fn = fn } end },
     C_Map = {
         GetBestMapForUnit = function(unit) return unit == "player" and playerMap end,
         GetPlayerMapPosition = function(map, unit)
@@ -113,6 +128,8 @@ local env = setmetatable({
     },
     CreateVector2D = Vector,
     ERR_INV_FULL = "Inventory is full.",
+    ERR_BAG_FULL = "That bag is full.",
+    ERR_NOT_ENOUGH_MONEY = "You don't have enough money.",
     Enum = { ItemClass = { Tradegoods = 7 } },
     MerchantFrame = { IsShown = function() return merchantShown end },
     UnitName = function(unit) return unit == "npc" and vendorName or "Player" end,
@@ -124,6 +141,8 @@ local env = setmetatable({
     GetMoney = function() return money end,
     BuyMerchantItem = function(index, count)
         purchases[#purchases + 1] = { index = index, count = count }
+        local item = merchantItems[index].item
+        inFlight[item] = (inFlight[item] or 0) + count
     end,
 }, { __index = _G })
 function ns.OnApply(fn) env.hooksecurefunc(ns, "Apply", fn) end
@@ -144,7 +163,10 @@ P.Shopping = {
     VendorMaterials = function() return materials end,
     Bought = function(itemID, count)
         drops[itemID] = (drops[itemID] or 0) + count
+        have[itemID] = (have[itemID] or 0) + count
     end,
+    Have = function() return have end,
+    List = function() return crafts end,
     Redraw = function() redraws = redraws + 1 end,
 }
 P.ShoppingVendorView = { Hide = Noop, OnMerchantEvent = function() viewEvents = viewEvents + 1 end }
@@ -228,8 +250,11 @@ check("and Buy All is done when the last one lands", drops[222] == 5 and not V.W
 drops[111] = nil
 check("a purchase the merchant refuses is still asked for", V.BuyShoppingItem(111) == true)
 viewEvents = 0
-Fire("UI_ERROR_MESSAGE")
-check("an error stops the wait so Buy can be clicked again", not V.Waiting() and viewEvents == 1)
+Fire("UI_ERROR_MESSAGE", 0, "Not enough mana")
+check("an error that is not about the purchase keeps the wait, so Buy All cannot buy it twice",
+    V.Waiting() and viewEvents == 0)
+Fire("UI_ERROR_MESSAGE", 0, env.ERR_BAG_FULL)
+check("a refusal stops the wait so Buy can be clicked again", not V.Waiting() and viewEvents == 1)
 Fire("BAG_UPDATE_DELAYED")
 check("a refused purchase is never counted", drops[111] == nil)
 bags[111] = 40
@@ -240,10 +265,22 @@ drops[111] = nil
 V.BuyShoppingItem(111)
 merchantShown = false
 Fire("MERCHANT_CLOSED")
-check("closing the merchant stops waiting", not V.Waiting() and registry.BAG_UPDATE_DELAYED == nil)
+check("closing the merchant right after buying keeps counting what is on its way",
+    V.Waiting() and registry.BAG_UPDATE_DELAYED ~= nil)
 bags[111] = 50
 Fire("BAG_UPDATE_DELAYED")
-check("and nothing lands on the list after it", drops[111] == nil)
+check("so a purchase that lands after the close still counts", drops[111] == 10 and not V.Waiting())
+drops[111] = nil
+merchantShown = true
+V.BuyShoppingItem(111)
+merchantShown = false
+Fire("MERCHANT_CLOSED")
+Advance(5)
+check("one that never lands stops being waited for shortly after the close",
+    not V.Waiting() and registry.BAG_UPDATE_DELAYED == nil)
+bags[111] = 60
+Fire("BAG_UPDATE_DELAYED")
+check("and a bag change after that is not a purchase", drops[111] == nil)
 merchantShown = true
 
 local bought = #purchases
@@ -260,7 +297,26 @@ V.BuyShoppingItem(111)
 P.Settings.Set("shoppingVendor", false)
 check("turning the setting off drops a pending purchase", not V.Waiting() and registry.BAG_UPDATE_DELAYED == nil)
 
--- Buy Vendor Items Automatically: one Buy All when a merchant opens, once per visit.
+-- Buy Vendor Items Automatically: one Buy All when a merchant opens, once per visit, for what the list
+-- still needs less what you already carry. Like the Shopping List, the list below takes off what was
+-- bought through it.
+local need = {}
+P.Shopping.VendorMaterials = function()
+    local out = {}
+    for _, item in ipairs({ 111, 222, 333 }) do
+        local qty = (need[item] or 0) - (have[item] or 0)
+        if qty > 0 then out[#out + 1] = { item = item, qty = qty } end
+    end
+    return out
+end
+local INDEX = { [111] = 1, [222] = 2 }
+local function Clear(t) for key in pairs(t) do t[key] = nil end end
+local function Fresh(n111, n222)
+    Advance(5)
+    need[111], need[222], need[333] = n111, n222, 4
+    Clear(have); Clear(bags); Clear(inFlight); Clear(crafts)
+    drops, messages, bought = {}, {}, #purchases
+end
 local function Visit()
     merchantShown = true
     Fire("MERCHANT_SHOW")
@@ -270,49 +326,120 @@ local function Leave()
     Fire("MERCHANT_CLOSED")
 end
 local function Land()
-    bags[111], bags[222] = (bags[111] or 0) + 10, (bags[222] or 0) + 5
+    for item, count in pairs(inFlight) do
+        bags[item] = (bags[item] or 0) + count
+        inFlight[item] = nil
+    end
     Fire("BAG_UPDATE_DELAYED")
+end
+local function BoughtOf(item)
+    local n = 0
+    for i = bought + 1, #purchases do
+        if purchases[i].index == INDEX[item] then n = n + purchases[i].count end
+    end
+    return n
 end
 
 merchantShown = false
 P.Settings.Set("shoppingVendor", true)
-bought, messages = #purchases, {}
+Fresh(7, 7)
 Visit()
 check("with it off, opening a merchant buys nothing", #purchases == bought and #messages == 0)
 P.Settings.Set("shoppingVendorAuto", true)
-check("turning it on beside an open merchant buys nothing until the next visit", #purchases == bought)
+Fire("MERCHANT_UPDATE")
+check("turned on beside an open merchant, it waits for the next visit, even on a merchant update",
+    #purchases == bought)
 Leave()
 
 Visit()
-check("on, opening a merchant buys every listed material it sells, in merchant-sized chunks",
-    #purchases == bought + 3 and purchases[bought + 1].count == 5 and purchases[bought + 3].count == 5)
+check("on, opening a merchant buys what the list needs from it, in merchant-sized chunks",
+    BoughtOf(111) == 10 and BoughtOf(222) == 5 and #purchases == bought + 3)
 check("and says what it bought, as Buy All does", #messages == 1 and messages[1]:find("Bought", 1, true) ~= nil)
-check("and counts it on the Shopping List only once it lands", V.Waiting())
-drops[111], drops[222] = nil, nil
+check("and counts it on the Shopping List only once it lands", V.Waiting() and drops[111] == nil)
 Land()
 check("where it lands like a Buy All", drops[111] == 10 and drops[222] == 5 and not V.Waiting())
 Fire("MERCHANT_UPDATE")
 check("a merchant update in the same visit never buys again", #purchases == bought + 3)
 Leave()
-Land()
+bought = #purchases
 Visit()
-check("the next visit buys again", #purchases == bought + 6)
-Land()
-Leave()
-Fire("MERCHANT_SHOW")
-check("it buys even when MERCHANT_SHOW reaches it before the game shows MerchantFrame",
-    #purchases == bought + 9)
+check("the next visit buys only what is still missing", BoughtOf(111) == 0 and BoughtOf(222) == 5)
 Land()
 Leave()
 
+Fresh(7, 7)
+Fire("MERCHANT_SHOW")
+check("it buys even when MERCHANT_SHOW reaches it before the game shows MerchantFrame", BoughtOf(111) == 10)
+Land()
+Leave()
+
+Fresh(7, 7)
+bags[111], bags[222] = 40, 3
+Visit()
+check("it never buys what you already carry", BoughtOf(111) == 0)
+check("and buys only what you are still short of", BoughtOf(222) == 5 and #purchases == bought + 1)
+Land()
+Leave()
+
+Fresh(7, 0)
+have[111], bags[111] = 5, 5
+Visit()
+check("what the list bought earlier is not taken off a second time", BoughtOf(111) == 5)
+Land()
+Leave()
+
+Fresh(2, 0)
+bags[111] = 5
+crafts[1] = { got = { [111] = 5 } }
+Visit()
+check("nor is what the Crafting Queue already counted from your bags", BoughtOf(111) == 5)
+Land()
+Leave()
+
+Fresh(7, 7)
+Visit()
+Leave()
+check("closing at once keeps counting the purchase on its way", V.Waiting())
+Land()
+check("so it lands on the list after the close", drops[111] == 10 and drops[222] == 5)
+check("and nothing more is bought at the closed merchant", #purchases == bought + 3)
 bought = #purchases
+Visit()
+check("so the next merchant buys only what is still missing", BoughtOf(111) == 0 and BoughtOf(222) == 5)
+Land()
+Leave()
+
+Fresh(7, 7)
+Visit()
+Leave()
+bought = #purchases
+Visit()
+check("opening a merchant again while a purchase is on its way buys nothing more", #purchases == bought)
+Advance(5)
+check("and the close's timer does not stop the wait at the merchant opened again", V.Waiting())
+Land()
+check("once it lands, it buys what is still missing", BoughtOf(111) == 0 and BoughtOf(222) == 5)
+Land()
+Leave()
+
+Fresh(7, 7)
+Visit()
+Leave()
+Visit()
+Leave()
+bought = #purchases
+Land()
+check("a purchase landing after the merchant closed never starts another", #purchases == bought)
+
+Fresh(7, 7)
 merchantShown = true
 P.Settings.Set("vendorMaterials", true)
 check("a setting change beside an open merchant, which re-reads it, never buys", #purchases == bought)
 P.Settings.Set("vendorMaterials", false)
 Leave()
 
-money, messages = 100, {}
+Fresh(7, 7)
+money = 100
 Visit()
 check("short of gold for all of it, it buys nothing", #purchases == bought)
 check("and says so once", #messages == 1 and messages[1]:find("more than you have", 1, true) ~= nil)
@@ -321,7 +448,8 @@ check("not again on every merchant update", #messages == 1 and #purchases == bou
 Leave()
 money = 10000
 
-freeSlots, messages = 0, {}
+Fresh(7, 7)
+freeSlots = 0
 Visit()
 check("with full bags it buys nothing and shows the game's message once",
     #purchases == bought and #messages == 1 and messages[1] == env.ERR_INV_FULL)
@@ -330,21 +458,19 @@ check("and does not repeat it", #messages == 1)
 Leave()
 freeSlots = 10
 
-local listed = materials
-materials = {}
+Fresh(0, 0)
 Visit()
 check("a merchant that sells nothing on the list buys nothing", #purchases == bought)
-materials = listed
+need[111], need[222] = 7, 7
 Fire("MERCHANT_UPDATE")
 check("but once it does in the same visit, it buys then", #purchases == bought + 3)
 Land()
 Leave()
 
-bought = #purchases
-materials = {}
+Fresh(0, 0)
 Visit()
 P.Settings.Set("shoppingVendor", false)
-materials = listed
+need[111], need[222] = 7, 7
 P.Settings.Set("shoppingVendor", true)
 check("turning Vendor Items on Shopping List off spends the visit", #purchases == bought)
 Fire("MERCHANT_UPDATE")
