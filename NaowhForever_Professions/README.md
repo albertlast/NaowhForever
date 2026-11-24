@@ -623,6 +623,9 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   Shopping List and registers nothing of its own.
 - A real `MERCHANT_SHOW` arms it. The first time that merchant sells something on Buy from Vendor, it buys
   it as Buy All would. The visit is then spent, whatever the result.
+- Holding Shift as the merchant opens leaves it unarmed for that visit. It spends gold on its own, so
+  there is a way to open a merchant without it. Shift is read once, at `MERCHANT_SHOW`, so letting go
+  later does not arm it.
 - So a refusal (gold for all of it, full bags) is printed once, not on every `MERCHANT_UPDATE`.
 - A merchant that sells nothing on the list stays armed until it closes. Its item data can come with a
   later update.

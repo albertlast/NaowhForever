@@ -245,7 +245,9 @@ local function MerchantChanged(event, replay)
         SettleAfterClose()
     else
         ScanMerchant()
-        if event == "MERCHANT_SHOW" and not replay then autoArmed = AutoOn() and true or false end
+        if event == "MERCHANT_SHOW" and not replay then
+            autoArmed = AutoOn() and not IsShiftKeyDown() and true or false
+        end
     end
     if event ~= "MERCHANT_UPDATE" and S.Get("buyVendor") and ns.ProfWindowRefresh then ns.ProfWindowRefresh() end
     if not ShoppingOn() then return end

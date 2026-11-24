@@ -10,6 +10,7 @@ local merchantShown = false
 local purchases, messages, drops = {}, {}, {}
 local bags, freeSlots, money = {}, 10, 10000
 local have, crafts, inFlight = {}, {}, {}
+local shiftDown = false
 local timers, now = {}, 0
 local redraws, viewEvents = 0, 0
 local vendorName, vendorMap, vendorX, vendorY = "Far Supplies", 10, 0.8, 0.8
@@ -139,6 +140,7 @@ local env = setmetatable({
     GetMerchantItemID = function(index) return merchantItems[index] and merchantItems[index].item end,
     GetMerchantItemMaxStack = function(index) return merchantItems[index].stack end,
     GetMoney = function() return money end,
+    IsShiftKeyDown = function() return shiftDown end,
     BuyMerchantItem = function(index, count)
         purchases[#purchases + 1] = { index = index, count = count }
         local item = merchantItems[index].item
@@ -370,6 +372,19 @@ Leave()
 Fresh(7, 7)
 Fire("MERCHANT_SHOW")
 check("it buys even when MERCHANT_SHOW reaches it before the game shows MerchantFrame", BoughtOf(111) == 10)
+Land()
+Leave()
+
+Fresh(7, 7)
+shiftDown = true
+Visit()
+shiftDown = false
+check("holding Shift as the merchant opens skips the buy", #purchases == bought and #messages == 0)
+Fire("MERCHANT_UPDATE")
+check("for the whole visit, after Shift is let go too", #purchases == bought)
+Leave()
+Visit()
+check("and the next visit without Shift buys again", BoughtOf(111) == 10)
 Land()
 Leave()
 
