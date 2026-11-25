@@ -10,7 +10,7 @@ local merchantShown = false
 local purchases, messages, drops = {}, {}, {}
 local bags, freeSlots, money = {}, 10, 10000
 local have, crafts, inFlight = {}, {}, {}
-local shiftDown = false
+local shiftDown, itemData = false, true
 local timers, now = {}, 0
 local redraws, viewEvents = 0, 0
 local vendorName, vendorMap, vendorX, vendorY = "Far Supplies", 10, 0.8, 0.8
@@ -137,7 +137,9 @@ local env = setmetatable({
     UnitFactionGroup = function() return playerFaction end,
     issecretvalue = function() return false end,
     GetMerchantNumItems = function() return #merchantItems end,
-    GetMerchantItemID = function(index) return merchantItems[index] and merchantItems[index].item end,
+    GetMerchantItemID = function(index)
+        return itemData and merchantItems[index] and merchantItems[index].item or nil
+    end,
     GetMerchantItemMaxStack = function(index) return merchantItems[index].stack end,
     GetMoney = function() return money end,
     IsShiftKeyDown = function() return shiftDown end,
@@ -265,11 +267,36 @@ check("but one that lands after the error still counts", drops[111] == 10)
 
 drops[111] = nil
 V.BuyShoppingItem(111)
+viewEvents = 0
+Fire("UI_ERROR_MESSAGE", 0, "That item is sold out.")
+check("an error it does not know keeps the wait at first", V.Waiting() and viewEvents == 0)
+Advance(2)
+check("but when nothing lands soon after, it ends the wait, so Buy and Buy All work again",
+    not V.Waiting() and viewEvents == 1)
+bags[111] = 50
+Fire("BAG_UPDATE_DELAYED")
+check("and a late landing still counts", drops[111] == 10)
+
+drops[111], drops[222] = nil, nil
+V.BuyShoppingAll()
+viewEvents = 0
+Fire("UI_ERROR_MESSAGE", 0, "Not enough mana")
+bags[111] = 60
+Fire("BAG_UPDATE_DELAYED")
+Advance(2)
+check("an error while the purchase is landing keeps the wait for the rest, so Buy All cannot buy it twice",
+    V.Waiting() and viewEvents == 0 and drops[111] == 10)
+bags[222] = 10
+Fire("BAG_UPDATE_DELAYED")
+check("until the rest lands", drops[222] == 5 and not V.Waiting())
+
+drops[111] = nil
+V.BuyShoppingItem(111)
 merchantShown = false
 Fire("MERCHANT_CLOSED")
 check("closing the merchant right after buying keeps counting what is on its way",
     V.Waiting() and registry.BAG_UPDATE_DELAYED ~= nil)
-bags[111] = 50
+bags[111] = bags[111] + 10
 Fire("BAG_UPDATE_DELAYED")
 check("so a purchase that lands after the close still counts", drops[111] == 10 and not V.Waiting())
 drops[111] = nil
@@ -280,7 +307,7 @@ Fire("MERCHANT_CLOSED")
 Advance(5)
 check("one that never lands stops being waited for shortly after the close",
     not V.Waiting() and registry.BAG_UPDATE_DELAYED == nil)
-bags[111] = 60
+bags[111] = bags[111] + 10
 Fire("BAG_UPDATE_DELAYED")
 check("and a bag change after that is not a purchase", drops[111] == nil)
 merchantShown = true
@@ -478,9 +505,42 @@ Visit()
 check("a merchant that sells nothing on the list buys nothing", #purchases == bought)
 need[111], need[222] = 7, 7
 Fire("MERCHANT_UPDATE")
-check("but once it does in the same visit, it buys then", #purchases == bought + 3)
+check("and a craft queued later in the visit is never bought on a merchant update", #purchases == bought)
+Leave()
+
+Fresh(7, 7)
+itemData = false
+Visit()
+check("a merchant whose items have not loaded yet buys nothing", #purchases == bought)
+itemData = true
+Fire("MERCHANT_UPDATE")
+check("but buys on the update that brings them", #purchases == bought + 3)
 Land()
 Leave()
+
+Fresh(7, 5)
+Visit()
+Leave()
+Visit()
+Land()
+check("a merchant opened again while a purchase lands buys nothing once nothing is missing",
+    #purchases == bought + 3 and not V.Waiting())
+need[111] = 20
+Fire("MERCHANT_UPDATE")
+check("and nothing later in that visit either", #purchases == bought + 3)
+Leave()
+
+Fresh(7, 7)
+env.MERCHANT_HIGH_PRICE_COST = 450
+Visit()
+check("over the game's high-price mark it buys nothing", #purchases == bought)
+check("and says to use Buy All, once", #messages == 1 and messages[1]:find("Buy All", 1, true) ~= nil)
+Fire("MERCHANT_UPDATE")
+check("not again on a merchant update", #messages == 1 and #purchases == bought)
+check("Buy All still buys it", V.BuyShoppingAll() == true and #purchases == bought + 3)
+Land()
+Leave()
+env.MERCHANT_HIGH_PRICE_COST = nil
 
 Fresh(0, 0)
 Visit()

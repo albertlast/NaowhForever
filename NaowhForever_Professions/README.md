@@ -647,8 +647,13 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   there is a way to open a merchant without it. Shift is read once, at `MERCHANT_SHOW`, so letting go
   later does not arm it.
 - So a refusal (gold for all of it, full bags) is printed once, not on every `MERCHANT_UPDATE`.
-- A merchant that sells nothing on the list stays armed until it closes. Its item data can come with a
-  later update.
+- It buys only on opening. Once the merchant's items have loaded (every `GetMerchantItemID` answers)
+  and nothing bought is on its way, the visit is spent, even when there was nothing to buy. A craft
+  queued later in the visit then waits for the next one, instead of being bought on whatever
+  `MERCHANT_UPDATE` comes next (selling junk, buyback). A merchant whose items have not loaded stays
+  armed for the update that brings them.
+- A total above the game's `MERCHANT_HIGH_PRICE_COST` (`HIGH_PRICE`, 150 gold, when the client has none)
+  is left to Buy All, as the game's own merchant asks to confirm such a buy. It says so once in chat.
 - Apply replays `MERCHANT_SHOW` for a merchant already open, with `replay` set, and that never arms it.
   So changing a setting beside a merchant buys nothing. Turning Vendor Items on Shopping List off spends
   the visit.
@@ -663,9 +668,11 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
 - A merchant closed right after buying (Esc) keeps counting the purchase for `CLOSE_SETTLE` seconds.
   Otherwise it would never reach the list, and the next merchant would buy it again. A merchant opened
   again in that time waits for it to land, then buys what is still missing.
-- Only a refusal clears the wait before the purchase lands: `ERR_INV_FULL`, `ERR_BAG_FULL`,
-  `ERR_ITEM_MAX_COUNT` or `ERR_NOT_ENOUGH_MONEY` (`REFUSALS`). Any other UI error, such as a spell's,
-  used to clear it, and that let Buy All buy a purchase still on its way a second time.
+- A refusal clears the wait at once: `ERR_INV_FULL`, `ERR_BAG_FULL`, `ERR_ITEM_MAX_COUNT` or
+  `ERR_NOT_ENOUGH_MONEY` (`REFUSALS`). Any other UI error clears it only when nothing lands within
+  `ERROR_SETTLE` seconds. A spell's error while a purchase lands used to clear it at once, and Buy All
+  could then buy the rest a second time. A merchant error not in `REFUSALS` (unique, reputation, sold out)
+  still ends the wait, so Buy and Buy All never stay greyed out for the visit.
 - A vendor material's pin uses the shared waypoint system. Its built-in seller index is generated from
   Wowhead Classic's unlimited-stock inventories and matched to the Forever-adjusted NPC positions already
   in `Shared/Game/Towns.lua`; it has no runtime addon dependency. Merchant visits add to that

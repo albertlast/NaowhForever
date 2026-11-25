@@ -9140,3 +9140,4 @@ L["Lights this build's next talent without following it, so no points are spent 
 L["%s (followed)"] = true
 L["No build picked"] = true
 L["Show or hide this panel."] = true
+L["Buy Vendor Items Automatically: %s is more than %s, so buy it with Buy All."] = true

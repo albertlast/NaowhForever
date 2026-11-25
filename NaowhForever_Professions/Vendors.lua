@@ -14,6 +14,7 @@ local SPOT_NAME, SPOT_MAP, SPOT_X, SPOT_Y, SPOT_SIDE = 1, 2, 3, 4, 5
 local TOWN_X, TOWN_Y, TOWN_NAME, TOWN_SIDE = 1, 2, 4, 7
 local TEXT_TOO_DEAR = ns.L("Buy at Vendor: that costs %s, more than you have.")
 local TEXT_BOUGHT = ns.L("Bought %s for %s.")
+local TEXT_AUTO_TOO_DEAR = ns.L("Buy Vendor Items Automatically: %s is more than %s, so buy it with Buy All.")
 local TEXT_NO_VENDOR = ns.L("Visit a vendor that sells this item to remember its location.")
 local TEXT_PART = "%dx %s"
 local MERCHANT_EVENTS = { "MERCHANT_SHOW", "MERCHANT_UPDATE", "MERCHANT_CLOSED" }
@@ -22,6 +23,8 @@ local MERCHANT_KEYS = { enabled = true, shoppingList = true, shoppingVendor = tr
 local WAIT_EVENTS = { "BAG_UPDATE_DELAYED", "UI_ERROR_MESSAGE" }
 local REFUSALS = { "ERR_INV_FULL", "ERR_BAG_FULL", "ERR_ITEM_MAX_COUNT", "ERR_NOT_ENOUGH_MONEY" }
 local CLOSE_SETTLE = 5
+local ERROR_SETTLE = 2
+local HIGH_PRICE = 1500000
 
 local merchant
 local shoppingList, shoppingPool, buyList, buyPool, buyParts = {}, {}, {}, {}, {}
@@ -29,7 +32,7 @@ local expected, counted = {}, {}
 local townSpots
 local waiting = false
 local autoArmed = false
-local closings = 0
+local closings, errorChecks = 0, 0
 local AutoBuy, Open
 
 local function LearnedVendorItems()
@@ -209,16 +212,19 @@ local function Expect(itemID, count)
 end
 
 local function Settle()
+    local landed = false
     for itemID, left in pairs(expected) do
         local now = R.ItemCount(itemID)
         local got = math.min(left, now - counted[itemID])
         if got > 0 then
+            landed = true
             counted[itemID] = now
             expected[itemID] = left > got and left - got or nil
             P.Shopping.Bought(itemID, got)
         end
     end
     if next(expected) == nil then StopWaiting() end
+    return landed
 end
 
 local function SettleAfterClose()
@@ -239,6 +245,36 @@ local function Refused(message)
     return false
 end
 
+local function EndWait()
+    waiting = false
+    if merchant then merchant:UnregisterEvent("UI_ERROR_MESSAGE") end
+    P.ShoppingVendorView.OnMerchantEvent("UI_ERROR_MESSAGE")
+end
+
+local function OnUIError(message)
+    if Refused(message) then return EndWait() end
+    if not waiting then return end
+    errorChecks = errorChecks + 1
+    local check = errorChecks
+    C_Timer.After(ERROR_SETTLE, function()
+        if check == errorChecks and waiting then EndWait() end
+    end)
+end
+
+local function MerchantLoaded()
+    local n = GetMerchantNumItems()
+    if n == 0 then return false end
+    for i = 1, n do
+        if not GetMerchantItemID(i) then return false end
+    end
+    return true
+end
+
+local function TryAutoBuy()
+    AutoBuy()
+    if autoArmed and not waiting and MerchantLoaded() then autoArmed = false end
+end
+
 local function MerchantChanged(event, replay)
     if event == "MERCHANT_CLOSED" then
         autoArmed = false
@@ -251,23 +287,18 @@ local function MerchantChanged(event, replay)
     end
     if event ~= "MERCHANT_UPDATE" and S.Get("buyVendor") and ns.ProfWindowRefresh then ns.ProfWindowRefresh() end
     if not ShoppingOn() then return end
-    AutoBuy()
+    TryAutoBuy()
     P.Shopping.Redraw()
     P.ShoppingVendorView.OnMerchantEvent(event)
 end
 
 local function OnMerchantEvent(_, event, _, message)
     if event == "BAG_UPDATE_DELAYED" then
-        Settle()
-        AutoBuy()
+        if Settle() then errorChecks = errorChecks + 1 end
+        TryAutoBuy()
         return P.Shopping.Redraw()
     end
-    if event == "UI_ERROR_MESSAGE" then
-        if not Refused(message) then return end
-        waiting = false
-        merchant:UnregisterEvent(event)
-        return P.ShoppingVendorView.OnMerchantEvent(event)
-    end
+    if event == "UI_ERROR_MESSAGE" then return OnUIError(message) end
     MerchantChanged(event, false)
 end
 
@@ -413,6 +444,8 @@ function AutoBuy()
     local list, total = ShoppingNeeds(nil, true)
     if #list == 0 then return end
     autoArmed = false
+    local most = _G.MERCHANT_HIGH_PRICE_COST or HIGH_PRICE
+    if total > most then return ns.Print(TEXT_AUTO_TOO_DEAR:format(Text.Money(total), Text.Money(most))) end
     BuyEntries(list, total, true)
 end
 
