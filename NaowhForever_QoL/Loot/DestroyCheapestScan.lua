@@ -25,7 +25,7 @@ local QUALITY_KEY = {
     [6] = "destroyCheapestArtifact", [7] = "destroyCheapestHeirloom",
 }
 local TOOLS = {
-    [6948] = true, [5060] = true, [2901] = true, [7005] = true, [5956] = true, [6219] = true,
+    [6948] = true, [5060] = true, [2901] = true, [7005] = true, [6256] = true, [5956] = true, [6219] = true,
     [10498] = true, [9149] = true, [6217] = true, [6218] = true, [6338] = true, [6339] = true,
     [11128] = true, [11130] = true, [11144] = true, [11145] = true, [16206] = true, [16207] = true,
 }
@@ -84,11 +84,6 @@ end
 
 local function Kept(bag, slot, info, quality, vendor, classID, subclassID, bindType, setID)
     if D.Ignored(info.itemID) then return true end
-    if ShowAll() then return false end
-    if quality == nil or quality < 0 or not QualityOn(quality) then return true end
-    if not vendor or vendor <= 0 then
-        if classID ~= CLASS.CONSUMABLE or not ConsumableOn() then return true end
-    end
     if KEEP_CLASS[classID] then return true end
     if setID and setID > 0 then return true end
     if classID == CLASS.WEAPON and subclassID == FISHING then return true end
@@ -97,7 +92,24 @@ local function Kept(bag, slot, info, quality, vendor, classID, subclassID, bindT
     if ns.IsBisItem and ns.IsBisItem(info.itemID) then return true end
     if QuestSlot(bag, slot) then return true end
     if BIND_QUEST and bindType == BIND_QUEST then return true end
-    return BoundGear(classID, info, bindType)
+    if BoundGear(classID, info, bindType) then return true end
+    if ShowAll() then return false end
+    if quality == nil or quality < 0 or not QualityOn(quality) then return true end
+    if not vendor or vendor <= 0 then
+        if classID ~= CLASS.CONSUMABLE or not ConsumableOn() then return true end
+    end
+    return false
+end
+
+local function MaxValue()
+    if ShowAll() then return 0 end
+    local cap = S.Get("bagCleanupMaxValue")
+    if type(cap) ~= "number" then return 0 end
+    return cap
+end
+
+local function OverCap(worth, cap)
+    return cap > 0 and type(worth) == "number" and worth > cap
 end
 
 function D.UseMarket()
@@ -219,21 +231,24 @@ function D.FlushLoads()
     end)
 end
 
+local function Offerable(bag, slot, info)
+    local name, quality, vendor, classID, subclassID, bindType, setID = ItemFacts(info)
+    local showAll = ShowAll()
+    if name == nil or (quality == nil and not showAll) then return nil end
+    if vendor == nil then
+        if not showAll and (classID ~= CLASS.CONSUMABLE or not ConsumableOn()) then return nil end
+        vendor = 0
+    end
+    if Kept(bag, slot, info, quality, vendor, classID, subclassID, bindType, setID) then return false end
+    return true, name, quality, vendor
+end
+
 local function ScanSlot(bag, slot)
     local info = GetContainerItemInfo(bag, slot)
     if not (info and info.itemID) or info.isLocked then return end
-    local name, quality, vendor, classID, subclassID, bindType, setID = ItemFacts(info)
-    local showAll = ShowAll()
-    if name == nil or (quality == nil and not showAll) then
-        return Queue(info.itemID)
-    end
-    if vendor == nil then
-        if not showAll and (classID ~= CLASS.CONSUMABLE or not ConsumableOn()) then
-            return Queue(info.itemID)
-        end
-        vendor = 0
-    end
-    if Kept(bag, slot, info, quality, vendor, classID, subclassID, bindType, setID) then return end
+    local offer, name, quality, vendor = Offerable(bag, slot, info)
+    if offer == nil then return Queue(info.itemID) end
+    if not offer then return end
     local e = Take()
     local count = info.stackCount or 1
     e.bag, e.slot, e.itemID = bag, slot, info.itemID
@@ -241,7 +256,7 @@ local function ScanSlot(bag, slot)
     e.count, e.quality, e.value = count, quality, vendor * count
     ApplyMarket(e, info.itemID, count)
     e.rank = RankValue(e)
-    if maxValue > 0 and e.rank > maxValue then
+    if OverCap(e.rank, maxValue) then
         D.used = D.used - 1
         return
     end
@@ -263,7 +278,7 @@ function D.Scan()
     ReadSets()
     local last = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS
     local everyBag = ShowAll()
-    maxValue = not everyBag and S.Get("bagCleanupMaxValue") or 0
+    maxValue = MaxValue()
     for bag = BACKPACK_CONTAINER, last do
         if everyBag or D.IsPlain(bag) then
             for slot = 1, GetContainerNumSlots(bag) or 0 do ScanSlot(bag, slot) end
@@ -331,6 +346,22 @@ function D.ReadLoot()
             end
         end
     end
+end
+
+function D.Matches(pick)
+    if type(pick) ~= "table" then return false end
+    local info = GetContainerItemInfo(pick.bag, pick.slot)
+    if not (info and info.itemID == pick.itemID) or info.isLocked then return false end
+    if info.hyperlink ~= pick.link or (info.stackCount or 1) ~= pick.count then return false end
+    if not ShowAll() and not D.IsPlain(pick.bag) then return false end
+    local offer, _, _, vendor = Offerable(pick.bag, pick.slot, info)
+    if not offer or vendor * pick.count ~= pick.value then return false end
+    local worth = pick.value
+    if RankMarket() then
+        local price, _, fresh = D.Quote(pick.itemID)
+        if price and fresh then worth = price * pick.count end
+    end
+    return not OverCap(worth, MaxValue())
 end
 
 function D.WorthIt(pick, loot)

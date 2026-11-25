@@ -29,6 +29,12 @@ local ITEMS = {
     [15] = { "INVTYPE_WEAPON", { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 28 } },
     [16] = { "INVTYPE_HOLDABLE", { ITEM_MOD_AGILITY_SHORT = 100 } },
     [17] = { "INVTYPE_2HWEAPON", { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 40 } },
+    [30] = { "INVTYPE_HAND", { ITEM_MOD_HIT_RATING_SHORT = 30 } },
+    [31] = { "INVTYPE_HAND", { ITEM_MOD_HIT_RATING_SHORT = 10 } },
+    [32] = { "INVTYPE_WAIST", { ITEM_MOD_HIT_RATING_SHORT = 40 } },
+    [33] = { "INVTYPE_WAIST", {} },
+    [34] = { "INVTYPE_2HWEAPON", { ITEM_MOD_HIT_RATING_SHORT = 10 } },
+    [35] = { "INVTYPE_2HWEAPON", {} },
 }
 
 -- A secret number: any arithmetic or comparison on it fails, as in the game.
@@ -54,6 +60,7 @@ local function Fixture(class)
         STATUS = { untested = "" },
     }
     ns.AccountSettings = function() return state.account end
+    ns.CharKey = function() return state.char or "Neo-Realm" end
     ns.Color = function(_, text) return text end
     ns.Print = function(text) state.printed[#state.printed + 1] = text end
     ns.Apply = NOTHING
@@ -68,6 +75,22 @@ local function Fixture(class)
             return state.speed or 2, state.offSpeed
         end,
         C_Secrets = { ShouldUnitStatsBeSecret = function() return state.secret == true end },
+        -- Hit from talents and race, as the character sheet adds it to your gear's.
+        GetHitModifier = function() return state.talentHit or 0 end,
+        GetRangedHitModifier = function() return state.talentHit or 0 end,
+        GetSpellHitModifier = function() return state.talentSpellHit or 0 end,
+        -- Hit rating's percent as the character sheet reads it: your gear's, plus state.setHit
+        -- (a set bonus or enchant no item's stats carry).
+        CR_HIT_MELEE = "melee", CR_HIT_RANGED = "ranged", CR_HIT_SPELL = "spell",
+        GetCombatRatingBonus = function(rating)
+            local hit = state.setHit or 0
+            for _, id in pairs(state.worn) do
+                local stats = ITEMS[id] and ITEMS[id][2] or {}
+                hit = hit + (stats.ITEM_MOD_HIT_RATING_SHORT or 0) / 10
+                if rating == "spell" then hit = hit + (stats.ITEM_MOD_HIT_SPELL_RATING_SHORT or 0) / 10 end
+            end
+            return hit
+        end,
         -- A frame that keeps its events and its handler, for the talent watcher.
         CreateFrame = function()
             local f = { events = {} }
@@ -170,9 +193,9 @@ do
     end
     check("a rogue's specs are a rogue's", #SW.ClassSpecs() == 3 and SW.ClassSpecs()[1].class == "ROGUE")
     check("with no talents nor pick, the first is yours", SW.ActiveSpec() == "assassination-rogue")
-    ns.StatWeightSettings.Set("spec", "combat-rogue")
+    SW.PickSpec("combat-rogue")
     check("the one picked on the page is", SW.ActiveSpec() == "combat-rogue")
-    ns.StatWeightSettings.Set("spec", "fire-mage")
+    SW.PickSpec("fire-mage")
     check("never another class's", SW.ActiveSpec() == "assassination-rogue")
 end
 
@@ -237,6 +260,12 @@ do
         and SW.KeyAmount("ITEM_MOD_DODGE_RATING_SHORT", 12) == 1 and SW.KeyAmount("ITEM_MOD_BLOCK_RATING_SHORT", 5) == 1
         and SW.KeyAmount("ITEM_MOD_AGILITY_SHORT", 7) == 7)
     check("KeyWorth reads the rating too", math.abs(SW.KeyWorth("ITEM_MOD_HIT_RATING_SHORT", 10, fury) - fury.hit) < 1e-9)
+    -- One school's damage is a stat of its own: Umbral Crystal against Skullspell Orb for a Demonology warlock.
+    local demo = { sta = 0.1, int = 0.158, shadow = 0.82 }
+    local crystal = SW.Worth({ ITEM_MOD_STAMINA_SHORT = 5, ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT = 17 }, demo)
+    check("shadow damage is worth its weight", math.abs(crystal - 14.44) < 1e-9
+        and crystal > SW.Worth({ ITEM_MOD_INTELLECT_SHORT = 12 }, demo))
+    check("and KeyWorth reads it", math.abs(SW.KeyWorth("ITEM_MOD_FIRE_DAMAGE_DONE_SHORT", 10, { fire = 0.5 }) - 5) < 1e-9)
     -- Specs that play differently are weighed differently.
     local function Differ(a, b)
         local x, y = SW.Spec(a).weights, SW.Spec(b).weights
@@ -312,12 +341,34 @@ do
     check("watching the game's talent change", watcher and watcher.events.TRAIT_CONFIG_UPDATED)
     watcher.onEvent()
     check("then read again", SW.ActiveSpec() == "subtlety-rogue")
-    ns.StatWeightSettings.Set("spec", "assassination-rogue")
+    SW.PickSpec("assassination-rogue")
     check("a spec picked by hand wins", SW.ActiveSpec() == "assassination-rogue")
-    ns.StatWeightSettings.Set("spec", nil)
+    SW.PickSpec(nil)
     state.spent = { 0, 0, 0 }
     watcher.onEvent()
     check("no points yet: the first", SW.ActiveSpec() == "assassination-rogue")
+end
+
+-------------------------------------------------------------------------------
+--  Your spec is picked per character
+-------------------------------------------------------------------------------
+do
+    local ns, state = Fixture("DRUID")
+    local SW = ns.StatWeights
+    ns.StatWeightSettings.Set("spec", "feral-tank-druid")
+    check("a pick from before is kept", SW.ActiveSpec() == "feral-tank-druid")
+    SW.PickSpec(nil)
+    check("and Automatic can replace it", SW.PickedSpec() == nil and SW.ActiveSpec() == "balance-druid")
+    SW.PickSpec("feral-tank-druid")
+    state.char = "Bear-Realm"
+    SW.PickSpec("restoration-druid")
+    check("another character's pick is its own", SW.ActiveSpec() == "restoration-druid")
+    state.char = nil
+    check("and leaves yours alone", SW.ActiveSpec() == "feral-tank-druid")
+    local told = 0
+    SW.OnChange(function() told = told + 1 end)
+    SW.PickSpec("balance-druid")
+    check("a pick redraws what uses the weights", told == 1)
 end
 
 -------------------------------------------------------------------------------
@@ -509,6 +560,56 @@ do
 end
 
 -------------------------------------------------------------------------------
+--  Hit counts only up to the cap: 8% for attacks, 27% with a weapon in each hand, 17% for
+--  spells, your talents' hit included
+-------------------------------------------------------------------------------
+do
+    local ns, state = Fixture("ROGUE")
+    local SW = ns.StatWeights
+    local w = SW.For("combat-rogue")
+    local function Gain(id, slot) return SW.Gain(id, slot, w, SW.Power(w)) end
+    local function Expect(id, slot, hit)
+        return math.abs(Gain(id, slot) - 100 * hit * w.hit / SW.Power(w)) < 1e-6
+    end
+    check("no hit yet: 3% is all worth", Expect(30, 10, 3))
+    state.talentHit = 6
+    check("6% from talents: only 2% of 3% counts", Expect(30, 10, 2))
+    state.setHit = 2
+    check("hit no item's stats carry (a set bonus) fills the cap too", Expect(30, 10, 0))
+    state.setHit = nil
+    check("the power counts your talents, not just your gear", SW.Power(w) == 50 * (w.str + w.agi + w.sta))
+    state.worn[6] = 32
+    check("at the cap already: hit is worth nothing", Expect(31, 10, 0))
+    check("over the cap: swapping hit away costs only what drops under", Expect(33, 6, -2))
+    check("your worth counts your gear's hit up to the cap", math.abs(SW.Power(w)
+        - (50 * (w.str + w.agi + w.sta) + 2 * w.hit)) < 1e-6)
+    state.worn[16], state.worn[17] = 7, 8
+    check("a weapon in each hand: white swings still miss, up to 27%", Expect(30, 10, 3))
+    local power = SW.Power(w)
+    check("a two-hander drops you back to the 8% cap: its hit past it is worth nothing",
+        math.abs(SW.Gain(34, 16, w, power, 17) - SW.Gain(35, 16, w, power, 17)) < 1e-6)
+    state.worn[17], state.talentHit, state.worn[6] = nil, 6, nil
+    local before = SW.Power(w)
+    state.secret = true
+    state.talentHit = 0
+    check("secret stats: hit as last read", math.abs(SW.Gain(30, 10, w, SW.Power(w)) - 100 * 2 * w.hit / before) < 1e-6)
+    state.secret = false
+    state.talentHit = 6
+    check("the Gear Score card's hit: only what counts", SW.CountedHitRating("ITEM_MOD_HIT_RATING_SHORT", 30, w) == 20
+        and SW.CountedHitRating("ITEM_MOD_AGILITY_SHORT", 30, w) == 30)
+    local mage = SW.For("frost-mage")
+    state.talentSpellHit = 6
+    check("a caster's hit against the 17% spell cap", SW.CountedHitRating("ITEM_MOD_HIT_RATING_SHORT", 150, mage) == 110)
+end
+do
+    local ns, state = Fixture("HUNTER")
+    local SW = ns.StatWeights
+    local w = SW.For("marksmanship-hunter")
+    state.worn[6], state.worn[16], state.worn[17], state.talentHit = 32, 7, 8, 6
+    check("a hunter's two melee weapons leave the cap at 8%", math.abs(SW.Gain(30, 10, w, SW.Power(w))) < 1e-6)
+end
+
+-------------------------------------------------------------------------------
 --  The tooltip line
 -------------------------------------------------------------------------------
 do
@@ -560,6 +661,20 @@ do
     check("a cloak asked as anyone's, not as cloth", asked == "ROGUE 4 0")
     ITEMS[1][1] = "INVTYPE_HAND"
     ns.ClassCanUse = nil
+    check("only your spec's line by default", #Lines(1) == 1)
+    S.Set("allSpecs", true)
+    lines = Lines(1)
+    check("All Specs: your spec's line first, then the class's others", #lines == 3
+        and lines[1]:find("Assassination", 1, true) and lines[2]:find("Combat", 1, true)
+        and lines[3]:find("Subtlety", 1, true))
+    ns.StatWeights.PickSpec("combat-rogue")
+    lines = Lines(1)
+    check("All Specs: a later spec of yours still comes first", #lines == 3
+        and lines[1]:find("Combat", 1, true) and lines[2]:find("Assassination", 1, true)
+        and lines[3]:find("Subtlety", 1, true))
+    ns.StatWeights.PickSpec(nil)
+    check("All Specs: still nothing on what is worse", #Lines(9) == 0)
+    S.Set("allSpecs", false)
     S.Set("enabled", false)
     check("the module off, no line", #Lines(1) == 0)
 end
@@ -835,7 +950,7 @@ do
     env.GetManaRegenFromSpirit = function() return 10, 1.5 end
     -- Every item here is leather; whether a priest can wear it is its own check.
     ns.ClassCanUse = nil
-    S.Set("spec", "holy-priest")
+    SW.PickSpec("holy-priest")
     S.Set("enabled", true)
     local OnItem = state.postCalls[1]
     local function Lines(id)
@@ -858,7 +973,7 @@ do
     local lines = table.concat(Lines(10), " ")
     check("its own line, beside the healing one", lines:find("% mana|r", 1, true) and lines:find("Holy", 1, true))
     check("nothing for an item with no mana", not table.concat(Lines(1), " "):find("mana", 1, true))
-    S.Set("spec", "shadow-priest")
+    SW.PickSpec("shadow-priest")
     check("not for a damage spec", not table.concat(Lines(10), " "):find("mana", 1, true))
 end
 

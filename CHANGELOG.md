@@ -3,12 +3,203 @@
 ## Unreleased
 
 ### Changed
+- Dungeon Journal: its data is updated to WoW Forever build 1.60.1.71091.
+- Dungeon Journal: boss loot updated from the latest Forever loot lists.
+
+## 1.4.10
+
+### Added
+- Dungeon Journal: Entrances on the World Map shows each door of Dire Maul (East, its back door,
+  West, North), Stratholme (Main Gate, Service Entrance) and Uldaman (front and back), named on
+  hover.
+- Blessings: Shift-click a class button to cast the normal blessing instead of the Greater one, or
+  Shift-click a player in the player list to cast their Greater Blessing.
+- Dungeon Journal: dungeon quests warn you in red on their tooltip when something is easy to miss,
+  like a step done outside the dungeon, one to finish before the last boss, or a prerequisite that
+  needs a group (with Quest Help on).
+- The Market: Cheap Upgrades (Crafting & Market > The Market, off by default) adds an Upgrades view
+  to Buy: the gear in your scans that beats what you wear, at or under your price, biggest upgrade
+  first. A click finds it on the auction house.
+- QoL > Interface > Names & Badges: Names Over Heads can hide friendly and enemy pet, guardian and
+  totem names, and keeps your choice across logins.
+- Stat Weights: All Specs on Tooltips (BiS List > Settings > Stat Weights, off by default) shows the
+  upgrade line for each of your class's specs, yours first.
+- Buffs & Consumables: a Demonic Sacrifice reminder for warlocks (off by default, under Personal
+  Buffs to Remind). It shows while you have none of the sacrifice buffs, and a click sacrifices the
+  demon you have out.
+- Watch List: Lock Window and Progress Bars (reputations and capped currencies), on the Watch List
+  card.
+- Mail & Alts: the mailbox's Alts menu has "Add a character", for your characters on another WoW
+  account, such as a bank alt.
+- The Market: Ctrl + Shift + click an item on any Market page to add it to your Watch List, a step
+  under its scan price.
+- QoL > Questing & Group: Whisper Invite invites players who whisper you one of your words (inv and
+  invite to start, off by default), with a Friends and Guild Only option.
+- Blessings: All Auras, under Aura Button on the Blessing Bar card, shows a button for each aura you
+  know and lights the one that is up.
+- The Market: Collect Mail puts a Collect button beside your inbox that takes all your mail, or only
+  sold, bought or expired auctions. Turn it on under My Auctions in The Market's settings.
+- BiS List: each slot's ranking now starts with the level-60 pre-raid pick most lists agree on, and
+  healers get level-60 picks. New List can start from Pre-raid BiS, a ready-made list of those picks
+  for your spec with backups; Naowh Picks is coming soon.
+- QoL > Glimmer > Hide Icon Above Objects removes the floating cog or flower over herbs, ore and
+  your bobber, and keeps Glimmer's effect.
+
+### Changed
+- Map Pins: profession trainers in town show their profession's icon on the map and minimap.
+- Buff Reminders: Righteous Fury now reminds a paladin with Redoubt learned (one point is enough),
+  instead of Improved Righteous Fury.
+- Trinket Bar: shows only the slots you have something equipped in, and hides when you wear none,
+  instead of showing a question mark.
+- Professions: the Recommended and Everything Enabled setups leave Search Favorites AH off. Turn it
+  on in Professions settings.
+- The Market: Dropped and Rose on the Price Graph no longer list gray or white items.
+
+### Fixed
+- BiS List: a BiS Route stop now lists every pick you still need from it, not only the best one per
+  slot.
+- Console Variables: settings the game protects in combat, such as SoftTargetInteract, are now
+  listed and can be pinned.
+- BiS List: Generate BiS List no longer picks rewards from high-level quests that have no required
+  level (Thrash Blade for a level 16), and the picker shows the level you can get them.
+- BiS List: swapping weapons no longer stutters while the generated (Auto) list is the one you use.
+- Stat Weights now counts Fire, Frost, Shadow, Nature, Arcane and Holy Damage on items, so upgrade
+  tooltips no longer miss them. Group Inspect's spell power from gear includes them too.
+- The Market: My Auctions shows an item someone else lists at your exact price as Matched instead of
+  Lowest.
+- Auction Prices: random-suffix gear ("of the Bear", "of the Owl") shows its own variant's auction
+  price on tooltips and in the Loot Feed, instead of the cheapest variant's.
+- Dungeon Journal: Run Panel: going from one Scarlet Monastery wing to the next (or from Lower to
+  Upper Blackrock Spire) starts that wing's own run, so each one finishes and keeps its own best
+  time.
+- Dungeon Journal: Run Panel: a Sunken Temple run finishes without Avatar of Hakkar, who only comes
+  with the Egg of Hakkar quest; he is marked optional.
+- Dungeon Journal: hovering an item no longer opens the comparison tooltips for your equipped gear
+  unless you hold Shift.
+- Dungeon Journal: opening the map inside a dungeon no longer stutters. The page beside it is drawn
+  at the loading screen and kept until something on it changes.
+- Discovery: Alliance characters now count The Lessons of Ta'zo toward the library books.
+- The Market: "Made by", Reagents and the Shopping List now show your alts' surnames, and alts that
+  share your first name show their Shopping Lists again.
+
+## 1.4.9
+
+### Added
+- The Market: when you buy part of a listing, the "Buy how many?" box shows the total cost and the
+  price each as you type, and lights the listings that amount buys from.
+- Map Pins: Town Pins on Minimap pins the town NPCs you picked on the map (repairs, inns, trainers)
+  near you on the minimap.
+- The Market: Buy > Searches: right-click a recent search to delete it, or pick Clear Recent from
+  the list menu to empty Recent.
+- Top Bar: Find can be added as a button, and has its own minimap button under Minimap Icons (off by
+  default).
+- Watch List: a small window of the reputations, currencies and items you pick to watch (Leveling &
+  Training > Experience).
+- Buffs & Consumables: Firestone and Spellstone reminders for warlocks (off by default, under
+  Personal Buffs to Remind). A click puts the stone on your main hand, or creates one when you carry
+  none.
+- Buffs & Consumables: a Righteous Fury reminder for paladins (off by default, under Personal Buffs
+  to Remind). It shows only with Improved Righteous Fury learned or while you are your group's tank.
+
+### Changed
+- Quest List: Hide Done now also hides the finished steps of a quest chain you are still on.
+
+### Fixed
+- Journeys: journeys into Ironforge go through the Deeprun Tram instead of placing a plain waypoint
+  with "No way found".
+- Map Pins: Riverglades' towns (Krol'dok Stronghold, the Alliance town and the goblin port) show
+  their vendors, trainers, inns, banks and stable masters.
+- Professions: nine camp blueprints, Spinning Wheel among them, show the dungeon boss that drops
+  them instead of a vendor that does not sell them.
+- Flight Point Reminder: no longer asks you to learn a flight point you already have after you open
+  a flight map somewhere else.
+- Professions: the window reopens where you left it, so you no longer scroll back down each time.
+
+## 1.4.8
+
+### Added
+- The Market: the Ledger's Sales, Purchases, Other and Failed lists have a Type filter beside the name
+  filter, so you can list only auction sales, only vendor sales, only repairs and so on. Each list
+  remembers its own.
+- Campfire: the Sleeping Bag now shows beside the Simple bar too, just past its right end.
+- Waypoint Pin: a skip button on the navigator moves a route on to its next stop.
+- Training Planner: Talent Overlay (off by default) lights the next talent of a build on your talent
+  window, with a panel to pick the build.
+- Loot Rolls: a small window of the group's loot rolls, showing who picked Need, Greed or Pass,
+  their roll and the winner; click an item for everyone's roll. Turn it on in Bags, Loot & Mail >
+  Loot.
+
+### Changed
+- Dungeon Journal: a quest both factions take from different givers shows only your faction's giver,
+  with a waypoint (Tome of Twilight in Krol'dok Stronghold).
+- BiS List and Stat Weights: hit counts only up to the hit cap (8% attacks, 17% spells, 27% with two
+  weapons), and your talents' hit is counted first, in upgrade percents and on the Gear Score card.
+
+### Fixed
+- Campfire: on the Simple style, the Camp Nearby alert now pops up in the middle of the screen when
+  your Camp Benefits is gone and a campfire is in range, as it does on Round.
+- Professions: searching the recipe list by a reagent's name now finds unlearned recipes too, so
+  "red" shows Hot Wolf Ribs.
+- Professions: the window no longer snaps back after a drag with BlizzMove or MoveAny.
+- Dungeon Journal: opening the world map inside a dungeon no longer draws the Journal page beside it
+  twice, which caused a short freeze.
+- Gear Reminders: the Argent Dawn Commission reminder also works with Seal of the Dawn and Rune of
+  the Dawn.
+- Badges: no more Lua error when hovering Naowh's badge on the character panel.
+- Stat Weights: each character keeps its own Your Spec pick instead of sharing one across
+  characters.
+- The Market: Farm's Start Loop moves on to the next stop when you get within 15 yards of one or
+  gather a node near it, instead of staying on the first.
+- Dungeon Journal: dungeons with many floors (like Scholomance) show every floor number on the map's
+  floor tabs instead of "..".
+- RestedXP: the Naowh window works with RestedXP 4.11.39.
+- The Market: after hiding the UI at the auction house (Alt+Z), the Farm page no longer opens with
+  the Sell page drawn under it.
+
+## 1.4.7
+
+### Added
+- Gear & Trinkets: the Trinket Bar's right-click picker shows each trinket's cooldown, and a new
+  Picker Side option sets which side of the slot it opens on.
+
+### Changed
+- Dungeon Journal: boss loot updated from the latest Forever loot lists.
+
+### Fixed
+- Badges: no more Lua errors when hovering a patron's unit frame while the tooltip is restricted.
+- Buffs & Consumables: Weapon Imbue, Poisons and the weapon stone reminder no longer ask for an
+  enchant on a fishing pole.
+- Journeys: no more Lua errors when combat starts while a route is being worked out.
+- XP Bar: rested experience starts after your quest XP instead of underneath it, so its full length
+  shows.
+- Dungeon Journal: Forever's own dungeon quests, like Magics of the Drowned City, now show the
+  quests to finish before you can pick them up.
+
+## 1.4.6
+
+### Added
+- Professions: Highest Profit in the recipe list's Filter > Sort lists all your recipes in one list,
+  the most profitable first (needs Crafting Profit, Profit in Recipe List and a price scan).
+- Smart Macros > Food Macro: Well Fed First makes NF Food use food that gives Well Fed before
+  higher-level food without a buff.
+- Loot Feed Count Size, to make the number on each icon bigger or smaller without changing the item
+  names.
+
+### Changed
 - Dungeon Journal: boss loot updated from the latest Forever loot lists.
 - BiS List: picks updated from wowsrc.com's latest lists.
 
 ### Fixed
 - Professions: a macro that clicks Create on an Enchanting recipe now enchants the item you chose
   in the Naowh window, so one-button levelling macros work with the window on.
+- BiS List: items from an imported list show where they come from, such as Magician's Cord from Pix
+  Xizzix, and an item with no known source says so instead of World drop.
+- RestedXP: the Naowh window shows again with RestedXP 4.11.38.
+- Professions: with TradeSkillMaster loaded, a TSM button on the window's title bar switches to
+  TSM's crafting window, and TSM's Default UI button switches back.
+- BiS List: Auto lists no longer pick trinkets from the other faction's quests.
+- Professions: a recipe that makes several items per craft shows the whole craft's profit in the
+  recipe list, as the Profitable filter already counted it.
 
 ## 1.4.5
 

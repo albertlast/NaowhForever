@@ -24,11 +24,6 @@ local function SlotState(p)
     return "here"
 end
 
-local function StillThere(p)
-    local info = GetContainerItemInfo(p.bag, p.slot)
-    return info and info.itemID == p.itemID and (info.stackCount or 1) == p.count and not info.isLocked
-end
-
 function D.ReturnCursor(p)
     if not D.CursorHolds(p.itemID) then return true end
     if InCombatLockdown() then return false end
@@ -102,13 +97,35 @@ function D.Resolve()
     GiveUp()
 end
 
-local function SameArmed(pick)
-    return D.armed and pick.bag == D.armedBag and pick.slot == D.armedSlot and pick.itemID == D.armedID
+function D.ArmedStill(pick, loot)
+    if not (D.armed and type(pick) == "table") then return false end
+    if pick.bag ~= D.armedBag or pick.slot ~= D.armedSlot or pick.itemID ~= D.armedID then return false end
+    if pick.count ~= D.armedCount or pick.link ~= D.armedLink then return false end
+    local lootSlot, lootLink
+    if type(loot) == "table" then lootSlot, lootLink = loot.slot, loot.link end
+    return lootSlot == D.armedLootSlot and lootLink == D.armedLootLink
 end
 
-local function Arm(pick)
+function D.Disarm()
+    D.armed = false
+    D.armedBag, D.armedSlot, D.armedID, D.armedCount, D.armedLink = nil, nil, nil, nil, nil
+    D.armedLootSlot, D.armedLootLink, D.armedForced = nil, nil, nil
+end
+
+local function SameArmed(pick, loot, forced)
+    return D.ArmedStill(pick, loot) and (forced == true) == (D.armedForced == true)
+end
+
+local function Arm(pick, loot, forced)
     D.armed = true
     D.armedBag, D.armedSlot, D.armedID = pick.bag, pick.slot, pick.itemID
+    D.armedCount, D.armedLink = pick.count, pick.link
+    if type(loot) == "table" then
+        D.armedLootSlot, D.armedLootLink = loot.slot, loot.link
+    else
+        D.armedLootSlot, D.armedLootLink = nil, nil
+    end
+    D.armedForced = forced == true
     D.Paint()
 end
 
@@ -118,15 +135,16 @@ function D.OnDestroy()
     if D.pending or not D.On() then return end
     local pick, loot = D.picks[D.index], D.loots[D.lootIndex]
     if not pick then return end
-    if not StillThere(pick) then
+    if not D.Matches(pick) then
+        D.Disarm()
         ns.Print(TEXT.MOVED)
         return D.Refresh()
     end
     if not allow and not D.WorthIt(pick, loot) then return D.Paint() end
     if GetCursorInfo() then return ns.Print(TEXT.HOLDING) end
     if InCombatLockdown() then return ns.Print(TEXT.COMBAT) end
-    if not SameArmed(pick) then return Arm(pick) end
-    D.armed = false
+    if not SameArmed(pick, loot, allow) then return Arm(pick, loot, allow) end
+    D.Disarm()
     D.pending = {
         bag = pick.bag, slot = pick.slot, itemID = pick.itemID, link = pick.link, name = pick.name,
         count = pick.count, value = pick.value, owned = GetItemCount(pick.itemID) or 0,

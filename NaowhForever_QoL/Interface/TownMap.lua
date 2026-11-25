@@ -74,6 +74,8 @@ local PIN_ROWS = {
     { key = "townMinimap", text = ns.L("Mailboxes on Minimap"), tip = ns.L("Pins the mailboxes near you on the minimap.") },
     { key = "townMinimapSpirit", text = ns.L("Spirit Healers on Minimap"),
       tip = ns.L("Pins the spirit healers near you on the minimap.") },
+    { key = "townMinimapNPCs", text = ns.L("Town Pins on Minimap"),
+      tip = ns.L("Pins the NPCs picked below near you on the minimap.") },
     { header = ns.L("SHOW IN TOWN") },
     { key = "townFlight", text = ns.L("Flight Masters") },
     { key = "townInn", text = ns.L("Innkeepers") },
@@ -110,6 +112,9 @@ local MAP_ART = {
     mail       = { "Mailbox", TRACKING .. "Mailbox" },
 }
 local ROUND_ART = { spirit = true }
+local TRADE_SPELLS = { Alchemist = 2259, Blacksmith = 2018, Tailor = 3908, Clothier = 3908, Leather = 2108,
+    Enchant = 7411, Engineer = 4036, Herbalis = 2366, Mining = 2575, Miner = 2575, Skinn = 8613,
+    ["First Aid"] = 3273, Cook = 2550, Fish = 7620 }
 local TRAVEL_ART = {
     Boat = { "FlightMasterFerry", "Islands-AllianceBoat", "Islands-HordeBoat" },
     Zeppelin = { "TaxiNode_Continent_Neutral", "Interface\\Icons\\INV_ZeppelinMount", "Vehicle-Air-Horde" },
@@ -184,9 +189,22 @@ local function TryArt(icon, art)
     return true
 end
 
+local function TradeIcon(title)
+    for word, spell in pairs(TRADE_SPELLS) do
+        if title:find(word, 1, true) then return C_Spell.GetSpellTexture(spell) end
+    end
+end
+
 local function SetPinArt(pin, npc)
     local icon, kind = pin.Icon, npc[3]
     SetRound(pin, false)
+    local trade = kind == "profession" and TradeIcon(npc[5])
+    if trade then
+        icon:SetTexture(trade)
+        icon:SetTexCoord(ICON_CROP_LOW, ICON_CROP_HIGH, ICON_CROP_LOW, ICON_CROP_HIGH)
+        pin.Border:Show()
+        return
+    end
     for _, art in ipairs(MAP_ART[kind] or EMPTY) do
         if TryArt(icon, art) then
             icon:SetTexCoord(FULL_LOW, FULL_HIGH, FULL_LOW, FULL_HIGH)
@@ -420,13 +438,15 @@ local function AddPin(map, shown, npc)
     if x then map:AcquirePin(TEMPLATE, npc, x, y, shown) end
 end
 
+local function Wanted(npc, faction, class, shops)
+    local kind = npc[3]
+    return (shops or EVERYWHERE[kind]) and npc[7]:find(faction, 1, true) and S.Get(CATEGORIES[kind][1])
+        and (kind ~= "class" or npc[6] == class) and (kind ~= "stable" or class == STABLE_CLASS)
+end
+
 local function AddNPCs(map, shown, list, faction, class, shops)
     for _, npc in ipairs(list or EMPTY) do
-        local kind = npc[3]
-        if (shops or EVERYWHERE[kind]) and npc[7]:find(faction, 1, true) and S.Get(CATEGORIES[kind][1])
-            and (kind ~= "class" or npc[6] == class) and (kind ~= "stable" or class == STABLE_CLASS) then
-            AddPin(map, shown, npc)
-        end
+        if Wanted(npc, faction, class, shops) then AddPin(map, shown, npc) end
     end
 end
 
@@ -460,7 +480,7 @@ function provider:RefreshAllData()
 end
 
 local function MiniOn()
-    return On() and (S.Get("townMinimap") or S.Get("townMinimapSpirit"))
+    return On() and (S.Get("townMinimap") or S.Get("townMinimapSpirit") or S.Get("townMinimapNPCs"))
 end
 
 local function MiniFit(map)
@@ -547,6 +567,13 @@ local function MiniRefresh()
     if miniMap and MiniFit(miniMap) then
         if S.Get("townMinimap") then AddSpots(ns.TownMailboxes[SameMap(miniMap)]) end
         if S.Get("townMinimapSpirit") then AddSpots(ns.TownSpiritHealers[SameMap(miniMap)]) end
+        if S.Get("townMinimapNPCs") then
+            local faction = UnitFactionGroup("player") == "Horde" and "H" or "A"
+            local _, class = UnitClass("player")
+            for _, npc in ipairs(ns.TownNPCs[SameMap(miniMap)] or EMPTY) do
+                if Wanted(npc, faction, class, true) then miniSpots[#miniSpots + 1] = npc end
+            end
+        end
         miniWidth, miniHeight = C_Map.GetMapWorldSize(miniMap)
     end
     for i = #miniSpots + 1, #miniPins do miniPins[i]:Hide() end
@@ -554,7 +581,7 @@ local function MiniRefresh()
     for i, spot in ipairs(miniSpots) do
         local pin = MiniPin(i)
         pin:SetSize(size, size)
-        pin.npc = spot
+        pin.npc, pin.mapID = spot, miniMap
         SetPinArt(pin, spot)
     end
     WatchMoving(#miniSpots > 0)

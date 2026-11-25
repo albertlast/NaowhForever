@@ -75,9 +75,9 @@ local function Owner(frame)
     return frame
 end
 
-local function SideButtons(panel, actions)
+local function SideButtons(panel, actions, panelWidth)
     local count = math.max(1, #actions)
-    local width = (PANEL_W - PANEL_PAD * 2 - BUTTON_GAP * (count - 1)) / count
+    local width = (panelWidth - PANEL_PAD * 2 - BUTTON_GAP * (count - 1)) / count
     local previous
     for _, action in ipairs(actions) do
         local button = ns.Button(panel, action[1], width, BUTTON_H, action[2])
@@ -107,7 +107,7 @@ local function PlaceBeside(panel, owner)
     panel:ClearAllPoints()
     local right = (owner:GetRight() or 0) * owner:GetEffectiveScale()
     local room = UIParent:GetRight() * UIParent:GetEffectiveScale() - right
-    if room >= (PANEL_W + BESIDE_ROOM) * owner:GetEffectiveScale() then
+    if room >= (panel:GetWidth() + BESIDE_ROOM) * owner:GetEffectiveScale() then
         panel:SetPoint("TOPLEFT", owner, "TOPRIGHT", BESIDE_GAP, 0)
     else
         panel:SetPoint("TOPRIGHT", owner, "TOPLEFT", -BESIDE_GAP, 0)
@@ -158,9 +158,11 @@ function Parts.Panel(title, windowLook, opacity)
     return panel
 end
 
-function Parts.SidePanel(actions, newView, opacity)
+function Parts.SidePanel(actions, newView, opacity, width)
+    local panelWidth = width or PANEL_W
     local bottom = #actions > 0 and PANEL_BUTTONS or 0
     local panel = Parts.Panel("", true)
+    panel:SetWidth(panelWidth)
     panel:SetFrameStrata("HIGH")
     panel.opacity = opacity
     panel.backdrop:Card(PANEL_INSET, PANEL_HEADER, PANEL_INSET, bottom + PANEL_INSET)
@@ -169,10 +171,10 @@ function Parts.SidePanel(actions, newView, opacity)
     scroll:SetPoint("TOPLEFT", PANEL_PAD, -PANEL_HEADER - PANEL_INSET)
     scroll:SetPoint("BOTTOMRIGHT", -PANEL_PAD - SCROLL_GAP, bottom + PANEL_PAD)
     local view = newView(scroll)
-    view:SetWidth(PANEL_W - PANEL_PAD * 2 - SCROLL_GAP)
+    view:SetWidth(panelWidth - PANEL_PAD * 2 - SCROLL_GAP)
     scroll:SetScrollChild(view)
     panel.scroll, panel.view, panel.owners, panel.buttons = scroll, view, {}, {}
-    SideButtons(panel, actions)
+    SideButtons(panel, actions, panelWidth)
     sidePanels[#sidePanels + 1] = panel
     return panel
 end

@@ -39,7 +39,8 @@ local CATEGORIES = {
     { name = "Leveling & Training", band = "CHARACTER", navIcon = "spark",
       subtitle = "Experience, trainers and talents on the way to 60.",
       pages = {
-          { name = "Experience", cards = { "QoL/XP:xpBar", "QoL/XP:xpTicker", "QoL/XP:groupXP" } },
+          { name = "Experience", cards = { "QoL/XP:xpBar", "QoL/XP:xpTicker", "QoL/XP:groupXP",
+              "QoL/XP:watchList" } },
           { name = "Spells & Talents", cards = { "@Training Planner", "Training Planner/Settings", "QoL/XP:trainer",
               "QoL/XP:talentPoints", "QoL/XP:legacyPoints" } },
           { name = "Skills", cards = { "Training Planner/Settings:skills" } },
@@ -104,7 +105,7 @@ local CATEGORIES = {
     { name = "Bags, Loot & Mail", band = "WORLD", navIcon = "checklist",
       subtitle = "Looting, junk, vendors and mail.",
       pages = {
-          { name = "Loot", cards = { "QoL/Loot & Items:lootFeed", "QoL/Loot & Items:lootTrade",
+          { name = "Loot", cards = { "QoL/Loot & Items:lootFeed", "QoL/Loot & Items:lootRolls", "QoL/Loot & Items:lootTrade",
               "QoL/Interface:undermineReal" } },
           { name = "Bags & Junk", cards = { "QoL/Loot & Items:bagCleanup", "QoL/Loot & Items:bagSpace",
               "QoL/Loot & Items:destroyCheapest", "QoL/Loot & Items:scrapMarker",
@@ -139,7 +140,7 @@ local CATEGORIES = {
               and { "@Group Finder", "Group Finder/Settings", "QoL/Questing & Group:finderRoles", "QoL/Interface:chatZones" }
               or { "QoL/Questing & Group:finderRoles", "QoL/Interface:chatZones" } },
           { name = "Group Tools", cards = { "@Group Inspect", "Group Inspect/Settings", "QoL/Questing & Group:groupButtons",
-              "QoL/Questing & Group:freeForAll", "QoL/Questing & Group:layerSwap",
+              "QoL/Questing & Group:whisperInvite", "QoL/Questing & Group:freeForAll", "QoL/Questing & Group:layerSwap",
               "QoL/Questing & Group:playerHistory" } },
       } },
     { name = "PvP", band = "COMBAT & GROUPS", navIcon = "trophy",

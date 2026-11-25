@@ -62,8 +62,10 @@ Core/Integrations/RestedXP/
 - Our themes take RestedXP's DarkMode art (`TEXTURES`), whose arrow is near black: it is the shade under
   the colored layer and reads as a plain black arrow without it. So with Style RestedXP's Arrow off, or
   RestedXP's own picked as the style, the arrow under a theme of ours is RestedXP's default one
-  (`RXP_ARROW`, or `RXP_ARROW_V2` with the window), put again after each `UpdateVisuals`. That is the one
-  hook the arrow has while it is off; under a theme of RestedXP's it does nothing.
+  (`RXP_ARROW`, or `RXP_ARROW_V2` with the window), put again after each redraw of RestedXP's: `UpdateTheme` since
+  RestedXP 4.11.39, `UpdateVisuals` before (`ARROW_RESTYLE`, the first one the arrow has; hooking one it has not is an
+  error in the game, and at login it stopped the window from starting). That is the one hook the arrow has while it is
+  off; under a theme of RestedXP's it does nothing.
 - RestedXP only sets the distance text, never shows or hides it, so hiding it is ours to undo.
   Moving it needs the anchor RestedXP gave it; a text with none has nothing to move or to give
   back, so it is left alone.
@@ -246,11 +248,15 @@ Core/Integrations/RestedXP/
   another tag's `id` or `qty` can mean something else.
 - The Active Targets and Active Items windows (`RXPTargetFrame`, `RXPItemFrame`) take the look of the
   active step's box: the colors of their v2 background and border textures are set in place after
-  `UpdateVisuals` (and after the targets' `RenderTargetFrameBackground`, which settings call alone), and
-  their title's text takes the window's face and color, kept at RestedXP's size so nothing is laid out
-  again. Each is hooked once (`watched`); a frame RestedXP makes later is taken at the next draw. The
+  RestedXP restyles them (and after the targets' `RenderTargetFrameBackground`, which settings call alone, where
+  RestedXP has one), and their title's text takes the window's face and color, kept at RestedXP's size so nothing
+  is laid out again. Since RestedXP 4.11.39 they are widgets (`targeting.activeTargetWindow`, `activeItemWindow`):
+  `UpdateTheme` of the widget restyles the frame, the title is the widget's, and there is no `UpdateVisuals` on the
+  frame; before, they were frames (`activeTargetFrame`, `activeItemFrame`) restyled with `UpdateVisuals` that held
+  their title. `SkinPart` takes the widget where there is one and the old frame where not, and a window with
+  neither is left alone. Each is hooked once (`watched`); a frame RestedXP makes later is taken at the next draw. The
   border follows the background, so a background RestedXP hides keeps its border hidden. Turned off
-  (the window), RestedXP's own `UpdateVisuals` paints them again, and the
+  (the window), RestedXP's own `UpdateTheme` (`UpdateVisuals`) paints them again, and the
   border is shown where the background is, as the title's is not set by it. The title is in the window's Title
   Color, as the guide's name is, and not in the accent. The buttons of the targets that have no portrait yet
   show a placeholder (the chat bubble for a friendly one, the sword for an enemy: file IDs 2056011 and 135274

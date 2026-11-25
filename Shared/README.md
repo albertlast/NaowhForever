@@ -12,7 +12,7 @@ Shared/
   Shared.lua       the namespace (ns.Shared), the map pin sections that QoL and other modules add to its Map & Pins tab
                    (Shared.MapPins, in order by Shared.MapPinSections), a map pin's scale (Shared.ScalePin), what a character keeps by its
                    GUID (Shared.CharacterData), and how long ago a time was (Shared.Ago)
-  Style.lua        the house look: colors (BiS stars, worn green, looks, red and warning orange), icons, sizes
+  Style.lua        the house look: colors (BiS stars, worn green, looks, red and warning orange, reputation standings), icons, sizes
   Data/            data only, generated; never edited by hand
     Forever.lua      what is new in WoW Forever, by ID (Shared.ForeverNew), from Tools/build/forever_new.py
     ItemFacts.lua    each dungeon item's class, subclass, item level, required level and quality before the
@@ -57,9 +57,10 @@ Shared/
                    Professions' side panels and QoL's Scan on Opening
   UI/Parts.lua     the small parts: icons in text (Parts.Inline), smooth textures, hover cards (Parts.Tip,
                    Parts.TipLines), the chevron, links (Parts.FlipLink puts the chevron first, pointing
-                   back: the Action Bars window's back link), icon buttons, the flat hover and pressed look
-                   on a bar button (Parts.Press: the item bars, Blessings, Gear Set and Trinket bars, Group
-                   Buttons), a short label in a pill of its color
+                   back: the Action Bars window's back link), icon buttons, the logo button (Parts.LogoButton:
+                   the Town Pins button on the world map, the Talent Overlay's on the talent window), the flat hover
+                   and pressed look on a bar button (Parts.Press: the item bars, Blessings, Gear Set and
+                   Trinket bars, Group Buttons), a short label in a pill of its color
                    (Parts.Pill, Parts.SetPill: Group Inspect's "NF"), the worn bar, the Wowhead copy card
   UI/Menus.lua     every right-click menu and dropdown (ns.ContextMenu, ns.DropdownMenu; ns.MenuOpen for
                    Parts.Tip): a list of our own, never the game's menus
@@ -100,8 +101,9 @@ Shared/
   UI/Forever.lua   the Forever skin's parts, each on the game's own art with a drawn fallback: the window
                    frame with its title bar, portrait and red close (Parts.ForeverFrame), insets, buttons,
                    fields, the search box, tabs, check boxes, dropdowns, sliders, swatches, the
-                   help tip, list bars, headings, scroll chevrons, and the options
-                   window's header band and metal rails (Parts.ForeverPanes)
+                   help tip, list bars, headings, scroll chevrons, a card on the game's card art
+                   (Parts.ForeverCard), and the options window's header band and metal rails
+                   (Parts.ForeverPanes)
   UI/Tabs.lua      a switch of parts side by side (Parts.Tabs), and a search box (Parts.SearchBox)
   UI/SettingsCard.lua a module's card at the top of its settings page: the logo, a line or two, and the
                    button that opens its window
@@ -216,15 +218,17 @@ Each file uses only the ones above it in `Shared.xml`. Every part sits on `ns.Sh
   | `opacity()` | its opacity, for `panel:Paint()` |
   | `load()`, `save(point, relativePoint, x, y)`, `place` | its place: read, saved on drag, and the default `{ point, relativePoint, x, y }` |
   | `mover(panel, onMoved)` | Unlock Mode's mover: return `ns.UI.AttachMover(panel, label, onMoved, page)`; it saves through `save` |
+  | `locked()` | true while dragging the window or its title must not move it; Unlock Mode's mover still does |
   | `maxHeight()` | taller than this, its body scrolls |
 
   The panel has `panel:Paint()`, `panel:Place()`, `panel:SetTrackerWidth(w)`,
   `panel:Fit(bodyHeight)` (true when it starts or stops scrolling: set its width again and
   redraw), `panel:ScrollGap()`, `panel:Top()` and `panel:SetRows(entries)`: pooled rows of
-  `{ text, sub, color, done, waypoint(entry), tip(row), click(row, button) }`, a pin column (a
-  tick once done), the text in `color` (`T.fg` when nil), returning their height. Keep the
-  entries and refill them, with shared functions that read the entry, and a redraw makes no
-  garbage. See `NaowhForever_DungeonJournal/UI/QuestTracker.lua`, and the Discovery trackers for `bar`,
+  `{ text, sub, color, done, waypoint(entry), tip(row), click(row, button), bar, barColor }`, a pin
+  column (a tick once done), the text in `color` (`T.fg` when nil), a thin bar under the lines
+  filled to `bar` (0 to 1) in `barColor` (`T.accent` when nil) when `bar` is set, returning their
+  height. Keep the entries and refill them, with shared functions that read the entry, and a
+  redraw makes no garbage. See `NaowhForever_DungeonJournal/UI/QuestTracker.lua`, and the Discovery trackers for `bar`,
   `SetRows` and `mover`.
 - **A HUD panel:** an on-screen bar or pill uses the windows' own backdrop, `Parts.Backdrop(frame)`
   painted at `Style.BACKDROP_ALPHA` (near opaque, so the world does not tint it), with the 1px black
@@ -578,6 +582,9 @@ What a comment in the code used to say, in short. The house rules behind it are 
   point lines up with the text above. A disabled link rests muted and says why on hover.
 - An icon button's `margin` is the empty edge on the right of its image: it moves out by it, so
   the shapes, not their boxes, line up.
+- The logo button sits on top of a busy window (the world map, the talent trees), so it has a
+  dark fill (`LOGO_FILL`, 0.9) and a border, with the logo `LOGO_INSET` (4) in. Its border turns
+  the accent on hover, and stays so while what it opens is open (`Parts.LightLogoButton`).
 - The game cannot put text on the clipboard for an addon, so copying opens a copy card with the
   text selected (`Parts.CopyWowhead`, `ns.ShowCopyLine`).
 - An item's marks are the same wherever one is drawn (the BiS List's paperdoll, the character
@@ -614,8 +621,9 @@ What a comment in the code used to say, in short. The house rules behind it are 
   already run out (`STOP_AGO` seconds long, started that long ago) leaves it still.
 - A window's backdrop paints its opacity into the colors, not with SetAlpha: a texture's alpha
   does not reach a gradient's colors.
-- A side panel opens beside the window it was opened from, on whichever side has room, closes
-  with it (a `HookScript` on our own window), and opening one closes the others. Its buttons
+- A side panel opens beside the window it was opened from, on whichever side has room for its
+  width, closes with it (a `HookScript` on our own window), and opening one closes the others.
+  It is `PANEL_W` wide unless the caller gives it a width of its own. Its buttons
   share its width with a count of at least 1: the game's Lua stops on a division by zero.
 - Sharing never goes through the chat box: opening it from addon code taints it, and the game
   then blocks the next message you send. Say is offered only inside an instance, the one place
@@ -933,6 +941,12 @@ What a comment in the code used to say, in short. The house rules behind it are 
   frame. The waypoint card shows it only above 0% Background Opacity, as it did its edge. The frame
   takes the place of the edge the Group Buttons coloured under the mouse, so they show
   `Options_List_Hover` there instead (`Parts.ForeverHover`), as the game's Settings list does.
+- `Parts.ForeverCard(frame)` is a card's own art: a hidden texture across it, which
+  `Parts.PaintForeverCard(art, atlas, fallback)` shows with the first of the two this client has. It
+  answers whether it did, so the caller keeps its flat card and border when it did not. The caller
+  asks `ns.foreverSkin` first, as for the other parts; the Professions overview's cards wear the
+  game's profession cards with it. Those cards are in `FOREVER_ART_FILES`, since addons cannot look
+  them up by name.
 - `Parts.ProgressLine(parent, height, framed)`: a framed line (the XP tracker's, the trainer card's)
   is the game's cast bar on Forever (`Parts.ForeverProgress`, `FOREVER_CAST_BAR`: its track, gold
   fill untinted and frame cut into ends and middle). Unframed lines in list rows stay thin and

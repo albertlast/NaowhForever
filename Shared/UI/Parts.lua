@@ -1,4 +1,4 @@
--- Parts.lua: the small parts a page is made of (ns.Shared.Parts): icons in text, smooth textures, hover cards, the chevron, links and back links, icon buttons, the flat hover and pressed look for a bar button, pills, the worn bar and the Wowhead copy card.
+-- Parts.lua: the small parts a page is made of (ns.Shared.Parts): icons in text, smooth textures, hover cards, the chevron, links and back links, icon buttons, the logo button, the flat hover and pressed look for a bar button, pills, the worn bar and the Wowhead copy card.
 local ns = _G.NaowhForever
 local T = ns.THEME
 local Shared = ns.Shared
@@ -20,6 +20,7 @@ local COPY_FIELD = "url"
 local HOVER_ALPHA, PUSHED_ALPHA = 0.15, 0.35
 local FLAT_BLEND = "BLEND"
 local PUSHED_LAYER, PUSHED_SUBLEVEL = "ARTWORK", 1
+local LOGO_FILL, LOGO_INSET = 0.9, 4
 
 local function Tip(owner, anchor, x, y)
     if ns.MenuOpen() then return false end
@@ -84,6 +85,22 @@ end
 local function IconLeave(button)
     IconColor(button, T.accentSoft)
     GameTooltip:Hide()
+end
+
+local function LogoBorder(button, color)
+    button.border:SetColor(color.r, color.g, color.b, 1)
+end
+
+local function LogoEnter(button)
+    LogoBorder(button, T.accent)
+end
+
+local function LogoLeave(button)
+    if button.lit then
+        LogoBorder(button, T.accent)
+    else
+        LogoBorder(button, St.BORDER_RGB)
+    end
 end
 
 Parts.TOOLTIP_DROP = 1
@@ -175,6 +192,29 @@ function Parts.IconButton(parent, onClick, texture, margin, tip)
     button:SetScript("OnEnter", IconEnter)
     button:SetScript("OnLeave", IconLeave)
     return button
+end
+
+function Parts.LogoButton(parent, onClick)
+    local button = CreateFrame("Button", nil, parent)
+    ns.Solid(button, "BACKGROUND", T.bg, LOGO_FILL):SetAllPoints()
+    button.border = ns.Border(button, St.BORDER_RGB)
+    local logo = button:CreateTexture(nil, "ARTWORK")
+    logo:SetTexture(St.LOGO_SMALL)
+    logo:SetPoint("TOPLEFT", LOGO_INSET, -LOGO_INSET)
+    logo:SetPoint("BOTTOMRIGHT", -LOGO_INSET, LOGO_INSET)
+    button:SetScript("OnClick", onClick)
+    button:SetScript("OnEnter", LogoEnter)
+    button:SetScript("OnLeave", LogoLeave)
+    return button
+end
+
+function Parts.LightLogoButton(button, lit)
+    button.lit = lit
+    if lit or button:IsMouseOver() then
+        LogoBorder(button, T.accent)
+    else
+        LogoBorder(button, St.BORDER_RGB)
+    end
 end
 
 function Parts.Pill(parent, size, color)

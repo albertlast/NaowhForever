@@ -61,6 +61,7 @@ NaowhForever_DungeonJournal/
     Art.lua            each dungeon's loading screen from the game's files, for Dungeon Art, by hand
     Paintings.lua      each classic dungeon's painting and each boss's face from the game's files, for New Layout, generated
     QuestHelp.lua      which quests close another for good, and the items each quest asks for, generated
+    QuestTips.lua      what to know before a dungeon quest or a step of its chain, by quest ID, by hand
     QuestRewards.lua   the items each quest rewards, to choose from and to get, generated
   View/                drawing a page on the shared row engine; used by the window, the map panel and the popups
     Style.lua          what only the Journal draws: colors, icons, sizes (J.Style, over Shared/Style.lua)
@@ -73,7 +74,8 @@ NaowhForever_DungeonJournal/
     FinderPage.lua     the Loot Finder: its picks, then the loot that fits, each with its boss and dungeon
     CraftingPage.lua   the Crafting page: its picks, then the recipes that fit, each with its slot, skill and source
     DungeonHeader.lua  the dungeon's name, entrance link, Find Group, the previous and next dungeon, zone and stats (quests to do, BiS, looks), with Dungeon Art on its loading screen behind them
-    QuestRows.lua      your quests: marks, hover card, right-click menu
+    QuestMenu.lua      a quest's right-click menu and its chain menu
+    QuestRows.lua      your quests: marks, hover card, the row
     BossTips.lua       Naowh's tips: tooltip lines, sharing one in chat, the tip row
     KillCount.lua      the skull and a boss's kill count, its tooltip and the history it opens
     BossCards.lua      a boss card's header, with its level, this run's kill or next boss inside, a rare's silver tag and ring, and, with Boss Portraits on, its face
@@ -144,6 +146,7 @@ calls are on `ns`.
 | --- | --- |
 | A colour, a size, spacing, an icon | `View/Style.lua`; the house look every module shares (borders, BiS stars, cards, item rows, windows) is `Shared/Style.lua`. A number one file uses is at the top of that file; the dungeon map's are at the top of `UI/MapView.lua` and `UI/MapWindow.lua` |
 | A boss tip | `Data/Tips.lua`, keyed by the boss's NPC ID, one short sentence |
+| A quest tip (done outside, finish before the last boss, a group quest) | `Data/QuestTips.lua`, keyed by the quest's ID, one short sentence; a step's tip shows on its quest while it is the step you are on, with Quest Help on |
 | A dungeon's painting or a boss's face (New Layout) | `python Tools/build/journal_art.py`; a file it prints as not held is checked in a Forever client, then added to `Tools/data/journal_art_held.json` |
 | New Layout's pages | `UI/Window.lua` switches them (`ApplyMode`, `ShowHome`); the dungeon page is `UI/DungeonPane.lua`, the home pages `UI/Home.lua` and `UI/FactionHome.lua`, and a view draws its new look from its flags (`lootDense`, `headAside`, `finderAside`, `factionAside`, `searchTable`) |
 | The picture behind a dungeon's header (Dungeon Art) | `Data/Art.lua`: the file ID of the dungeon's loading screen, from the game's own tables (see Why) |
@@ -363,7 +366,10 @@ in the pull request it opens.
   versions, one per faction, either of which counts), `steps` (the rest of its chain, all of which
   must be done for Done), `lead` (a lead-in that only counts while you carry it) and `next`
   (`next[i] = { uiMapID, x, y, where }`, where `steps[i]` is picked up). A step is a quest ID or a
-  table of IDs (one per faction), any of which counts.
+  table of IDs (one per faction), any of which counts. `sides = { A = { where, uiMapID, x, y },
+  H = { ... } }` is for a quest both factions take from different givers: once the player's
+  faction is known (at load, or at PLAYER_LOGIN), its own giver replaces the text naming both
+  and gets the waypoint. Only Tome of Twilight has one so far.
 - The guide is Wowhead's Forever dungeon quest guide (patch 1.60.1, updated 2026-09-23).
   Positions on Stormwind, Mulgore, Redridge and the Eastern Plaguelands are converted to
   Forever's redrawn maps. The new dungeons' quests are by hand. Every dungeon's `levels` are
@@ -826,6 +832,10 @@ in the pull request it opens.
   the instance (`Shared.LayerOf`), read from kills, your target and nameplates. Back inside within
   `RUN_GRACE` after a reset, the first creature of a new copy ends the old run and starts a new one
   from the time you came in (`Kills.NewRun`), so its bosses show alive again before the first pull.
+- A kill of another dungeon's boss starts that dungeon's run from the time you came in. Scarlet
+  Monastery's four wings share instance map 189, and Lower and Upper Blackrock Spire share 229, so
+  hopping wings within `RUN_GRACE` keeps the same instance run. Without leaving the instance the new
+  run's time from the door holds the other dungeon too, so it is marked `partial`.
 - A run with no kill, trash, gold or loot is dropped when it closes, so a quick visit does not push
   a real run out of the `KEEP` (50) kept.
 - A run is finished once every numbered boss of one wing is dead; rares, optional bosses and a
@@ -954,6 +964,14 @@ in the pull request it opens.
   it is placed again when the map moves or scales: map movers (QoL's Map Window among them)
   call its `SetPoint` and `SetScale` on every frame of a drag, so that waits for the next frame,
   once. Hooked, not called back, so neither addon needs the other.
+- The panel keeps the page it drew while the map is shut (`keepHidden`), since drawing a big
+  dungeon's page on every open made the map stutter. While shut, its view only notes what it
+  hears: a quest log update is checked against the quest signature, a party member's against
+  their counts, a bag update against the counts the draw read (`Loot.RecordCounts` and every
+  item row, bags and bank apart), and any other event, a setting, a favourite, the BiS list, stat
+  weights, a new run, a loading screen, the dungeon map shown or not, or a lockout older than a
+  minute means the next open draws again. A loading screen into a dungeon draws its page then, a frame later so the run is noted first, with the map shut,
+  and so do item names that arrive while it is shut (never in combat), so an open finds it ready.
 - The world map calls every pin's `CheckMouseButtonPassthrough`, and its
   `SetPassThroughButtons` is protected: from our refresh it is blocked in combat, and the
   entrance pins want their clicks, so theirs does nothing. Pins acquired in combat taint the map,
@@ -1019,7 +1037,7 @@ in the pull request it opens.
 - `lua Tools/regression/test-journal-quests.lua`: the quest rules and the quest data.
 - `lua Tools/regression/test-journal-runs.lua`: the runs: splits, gold, XP, deaths and trash, when a
   run is finished, the trash total it teaches, Need rolls, bests and averages, reset runs, time
-  outside, and that nothing listens while the Run Panel is off.
+  outside, another dungeon's boss on the same map, and that nothing listens while the Run Panel is off.
 - `lua Tools/regression/test-journal-rare-alert.lua`: Rare Alert: what it sees, once a run, the chime, the
   Target button in and out of combat, and that nothing listens while it is off.
 - `python -m unittest discover -s Tools/tests`: the builders' rules (what a boss keeps, the

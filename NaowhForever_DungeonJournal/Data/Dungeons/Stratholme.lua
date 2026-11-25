@@ -6,10 +6,14 @@ ns.Journal.AddDungeon("Stratholme", {
     instance = 329,
     zone = "Eastern Plaguelands", area = 139, territory = "Contested",
     entrance = { map = 1423, x = 26.9, y = 11.8 },
+    doors = {
+        { name = "Main Gate", map = 1423, x = 26.1, y = 10.4 },
+        { name = "Service Entrance", map = 1423, x = 41.9, y = 15.8 },
+    },
     wings = {
         { name = "Main Gate", bosses = {
             { npc = 10808, name = "Timmy the Cruel", model = 571, encounters = { 474 }, loot = { 13400, 13402, 13401, 13403, 16724 }, chance = { 20, 19, 19, 18, 14 } },
-            { npc = 10516, name = "The Unforgiven", model = 10771, encounters = { 472 }, loot = { 13408, 13404, 13405, 13409 }, chance = { 16, 16, 16, 15 } },
+            { npc = 10516, name = "The Unforgiven", model = 10771, encounters = { 472 }, loot = { 13408, 13404, 13405, 13409, 16717 }, chance = { 16, 16, 16, 15, 15 } },
             { npc = 10558, name = "Hearthsinger Forresten", model = 10482, encounters = { 473 }, loot = { 13378, 16682, 13384, 13383 }, chance = { 15, 14, 14, 14 } },
             { npc = 10997, name = "Cannon Master Willey", model = 10674, encounters = { 475 }, loot = { 22403, 22407, 13380, 18721, 22405, 13382, 13381, 16708, 22404, 22406, 12839 }, chance = { 23, 22, 19, 19, 19, 18, 18, 16, 11, 9, 0 } },
             { npc = 10811, name = "Archivist Galford", model = 10544, encounters = { 477 }, loot = { 13386, 13387, 18716, 16692, 13385 }, chance = { 21, 21, 21, 18, 14 } },
@@ -19,7 +23,7 @@ ns.Journal.AddDungeon("Stratholme", {
             { npc = 11032, name = "Malor the Zealous", model = 10458, optional = true, encounters = { 476 }, loot = { 276397, 276398, 276399 } },
             { npc = 11058, name = "Ezra Grimm", model = 10475, optional = true, encounters = { 2797 }, loot = { 276394, 276395, 276396, 273117 } },
             { npc = 11143, name = "Postmaster Malown", model = 10669, optional = true, encounters = { 2798 }, loot = { 13388, 13392, 13393, 13391, 13389, 13390 }, chance = { 23, 18, 17, 15, 13, 6 } },
-            { npc = 10812, name = "Grand Crusader Dathrohan", model = 10545, optional = true, loot = { 12103, 18720, 22334 }, chance = { 18, 18, 2 } },
+            { npc = 10812, name = "Grand Crusader Dathrohan", model = 10545, optional = true, loot = { 18717, 13369, 18718, 13360, 13348, 12103, 18720, 13359, 22334, 13353 }, chance = { 22, 21, 21, 20, 19, 18, 18, 16, 2, 0 } },
             { npc = 14684, name = "Balzaphon", model = 7919, optional = true, loot = { 23126, 23124, 23125 }, chance = { 32, 29, 0 } },
         } },
         { name = "Service Entrance", bosses = {

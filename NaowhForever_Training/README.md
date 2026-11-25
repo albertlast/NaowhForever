@@ -4,8 +4,8 @@ Every spell your class still has to learn: what you can train now, what each lev
 it costs, with the trainer's own prices once you have visited one. A road to 60 with a dot for every
 level that brings spells, a Builds tab with talent builds level by level (Naowh's, saved, imported,
 edited, followed as you level), a mini bar, a level-up toast, a panel beside your class trainer, a
-Trainable tab under the spellbook, and a warlock's demon books, in the planner and at the demon trainer.
-Laid out like the [Dungeon Journal](../NaowhForever_DungeonJournal/README.md), on
+Trainable tab under the spellbook, a warlock's demon books, in the planner and at the demon trainer, and
+the Talent Overlay, a glow on the next talent of a build on the talent window. Laid out like the [Dungeon Journal](../NaowhForever_DungeonJournal/README.md), on
 [`Shared/`](../Shared/README.md).
 
 ## Layout
@@ -31,6 +31,8 @@ NaowhForever_Training/
   Grimoires.lua      Demon Books: the ranks each demon knows, read while it is out (Training.Grimoires)
   Weapons.lua        your weapon skills: their level, the weapons you carry, a weapon master's price
                      after your reputation discount (Training.WeaponSkills, Training.WeaponPrice)
+  NextTalent.lua     Talent Overlay: the next points to take from a build, and each character's pick of
+                     build for the talent window (Training.Next)
   View/
     Style.lua        the planner's own look, over Shared/Style.lua (Training.Style)
     Rows.lua         pooled cards, rows and section titles, a spell's tooltip and menu (Training.Rows)
@@ -45,6 +47,10 @@ NaowhForever_Training/
     TrainerPanel.lua the Panel at the Trainer
     DemonTrainer.lua Demon Books' marks at the merchant and the line in a book's tooltip
     Spellbook.lua    the Trainable tab under the spellbook and its panel
+    TalentWindows.lua the open talent window (Blizzard's or EllesmereUI's), and its talents' buttons
+    TalentMark.lua   the glow on the next talent, and the Preview Full Build glow
+    TalentDrawer.lua the side panel beside the talent window, and the button that opens it
+    TalentOverlay.lua turns the Talent Overlay on and off, and redraws it while a talent window is open
     SettingsPage.lua its settings page (Training Planner/Settings), declared as cards
 ```
 
@@ -186,6 +192,59 @@ view files and the window share.
   navigates the merchant from secure code. The tooltip line stays.
 - The books are not in the road's totals or the next visit: they come from another trainer, and a book for a
   demon never summoned may be known already.
+- The Talent Overlay is off by default, and nothing of it is made while it is off: no frame, event or hook until it
+  is first turned on. Turning it off again unregisters its events and hides what it drew.
+- While it is on, the talent events are registered only while a talent window is open, and
+  SPELL_DATA_LOAD_RESULT only while a talent's name is still loading. A burst of events draws once, a frame
+  later. The model tables and their rows are reused, so a redraw makes no new tables.
+- The Talent Overlay reads a talent's `currentRank` (`Training.Ranks` with unapplied points), not its
+  `activeRank`: `currentRank` changes as you click a point in or take one back, before you apply, so the
+  glow follows your clicks both ways.
+- The glow pulses only once the next talent can be bought (`canPurchaseRank`): your level gives the point,
+  but the talent can still be locked behind a row or the talent it needs. Until then it sits still and the
+  panel says it is locked for now.
+- Picking a build in the panel only lights it. It does not follow it, so nothing is bought for you. The pick
+  is kept per character, by GUID (`trainingNextPick`), with the class it was made on. With no pick, the panel
+  lights the build you follow and says that following spends its points for you.
+- On Blizzard's talent window a talent's button comes from the window's own `nodeIDToButton`, which holds
+  every active button. EllesmereUI's Classic Talents has no such table, so its shown children are searched,
+  at most 6 deep, into one reused list per depth. A button not drawn yet is looked for again on the next
+  frames, at most 10 times (`MAX_RETRIES`).
+- The glow is a frame of its own on the talent's button, in the button's own border shape, tinted with the
+  theme's accent. Nothing of the button's is changed or hidden. The windows' OnShow and OnHide are
+  post-hooked (HookScript), and EllesmereUI's window, made the first time it opens, is found through a
+  hooksecurefunc on `EllesmereUI.RegisterEscapeClose`.
+- Preview Full Build (off by default) lights every talent the build takes, learned or not, with a still
+  glow and the build's ranks out of the talent's (`3/5`) in its top right corner. Its glows sit one frame
+  level under the next talent's (`PREVIEW_ABOVE`), so that one stays on top. They are made the first time
+  the preview is on, one per talent, and reused after. On EllesmereUI's window one search fills a
+  node-to-button table for every talent (`Next.ButtonsByNode`), not one search per talent.
+- The panel is a `Parts.SidePanel` on UIParent beside the window, so its build menu draws over the talent
+  tree and not under it. Its rows are drawn by the shared row engine (`ns.Shared.View`), with five kinds of
+  its own: the build picker, the next talent, the talents after it, and the glow and preview switches.
+- The panel's Build title has two links (`SectionLink`): Import, the planner's own paste prompt
+  (`Training.PromptImport`), which picks the build once it is added; and Open Builds, the planner's Builds
+  tab, to rename, edit or delete one. The picker lists only your own class's builds, since the glow can
+  only light talents on your own class's talent window. A build for another class is saved for that class.
+- The panel redraws only when what it shows changes (`Next.DrawerSummary`). That summary holds each
+  build's key and name, so renaming a build in the planner renames it in the panel too.
+- The panel is 340 wide, not the usual 380, to fit beside Blizzard's talent window. The game centers that
+  window, and on our test screen it left about 353 on its right: a 380 wide panel opened on the left there,
+  and forcing it right covered the window's close button. 340 is about the widest that fits that room with
+  the side panel's spare. Where even 340 has no room, it opens on the left, as any side panel does.
+- The Talent Window Panel setting turns the button and the panel on or off together. Whether the panel is
+  open is kept apart from it, for the session only, as the Town Pins panel on the map is: it opens with the
+  talent window, the button or the panel's x closes it, and the button opens it again. Another side panel
+  opening beside the window closes it the same way, since only one side panel shows at a time.
+- The panel's button is the shared logo button (`Parts.LogoButton`), the same as the Town Pins button on
+  the world map, so it stands out on the talent window. Its border stays lit while the panel is open
+  (`Parts.LightLogoButton`). Like the Town Pins button in the map's corner, it sits in the corner of the
+  talent trees, under the Unspent Talents count: 64 below the search box's bottom right corner
+  (`UNDER_SEARCH`).
+- In the panel, the next talent's name and its cost sit `BIG_TEXT_DROP` (1px) inside the top and bottom of
+  its icon, where the Naowh font's letters line up with the icon's edges.
+- Under the Gamepad interface style the Talent Overlay stays off, as the Spellbook Tab does: that style moves
+  through the game's windows from secure code, and hooks on them would taint it.
 
 ## Checking
 

@@ -94,6 +94,7 @@
     <Script file="Data\Art.lua"/>
     <Script file="Data\Paintings.lua"/>
     <Script file="Data\QuestHelp.lua"/>
+    <Script file="Data\QuestTips.lua"/>
     <Script file="Data\QuestRewards.lua"/>
     <Script file="Loot.lua"/>
     <Script file="Finder.lua"/>
@@ -120,6 +121,7 @@
     <Script file="View\FinderPage.lua"/>
     <Script file="View\CraftingPage.lua"/>
     <Script file="View\DungeonHeader.lua"/>
+    <Script file="View\QuestMenu.lua"/>
     <Script file="View\QuestRows.lua"/>
     <Script file="View\BossTips.lua"/>
     <Script file="View\KillCount.lua"/>

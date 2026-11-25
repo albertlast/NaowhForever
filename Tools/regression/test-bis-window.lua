@@ -194,6 +194,10 @@ local function Fixture()
         UnitStat = function() return 50, 50 end,
         UnitAttackSpeed = function() return 2.6, 2.6 end,
         C_Secrets = { ShouldUnitStatsBeSecret = function() return false end },
+        GetHitModifier = function() return 0 end,
+        GetRangedHitModifier = function() return 0 end,
+        GetSpellHitModifier = function() return 0 end,
+        GetCombatRatingBonus = function() return 0 end,
         GetRealmName = function() return "Realm" end,
         GetInventoryItemID = function(_, slot) return state.worn[slot] end,
         GetInventoryItemTexture = function(_, slot) return state.worn[slot] and 134400 end,
@@ -321,7 +325,7 @@ local Measure = dofile("Tools/regression/measure.lua")(check)
 -------------------------------------------------------------------------------
 local ns, state, S = Fixture()
 local B = ns.BiS
-check("BiS.xml loads its files", #TocFiles("^NaowhForever_BiS/BiS/.*%.lua$") == 43)
+check("BiS.xml loads its files", #TocFiles("^NaowhForever_BiS/BiS/.*%.lua$") == 44)
 
 -- A font the game has not loaded yet measures 0 wide, as on a first open after login.
 METHODS.GetStringWidth = function() return 0 end
@@ -984,7 +988,10 @@ do
         and window.pages.shown == "list")
     B.Lists.List().route = nil
 end
-place = view.pools.place[1]
+-- The first place to run whose source is not a faction's or a quest's: those open their own link.
+local plain = 1
+while view.pools.place[plain].place.via do plain = plain + 1 end
+place = view.pools.place[plain]
 place.dungeon, place.map, place.spot = nil, 1413, nil
 place.scripts.OnClick(place)
 check("a zone to run to opens on the map, the BiS List put away", state.mapOpened == 1413 and not window:IsShown())
@@ -1065,8 +1072,9 @@ do
     for _, radio in ipairs(offered.radios) do
         if radio.data == source.id then picked = radio end
     end
-    check("Start From offers Empty, then the class lists", offered.radios[1].data == 0
-        and offered.titles[1] == "Class lists" and picked and picked.text == source.name)
+    check("Start From offers Empty, then the ready-made lists, then the class lists", offered.radios[1].data == 0
+        and offered.titles[1] == "Ready-made" and offered.titles[2] == "Class lists" and picked
+        and picked.text == source.name)
     picked.pick(source.id)
     check("a class list asks which spec's picks, the one on show first", specPick:IsShown() and specPick._get() == spec.key)
     local specs = Menu(specPick)
@@ -1103,6 +1111,37 @@ do
     B.Actions.New()
     picked.pick(source.id)
     check("with picks on two specs, Spec's Picks starts on the tab's", specPick._get() == other.key)
+    B.Actions.New()
+    local preRaid, naowh
+    for _, radio in ipairs(Menu(from).radios) do
+        if radio.data == "preRaid" then preRaid = radio elseif radio.data == "naowh" then naowh = radio end
+    end
+    check("Pre-raid BiS is offered, and Naowh Picks greyed as coming soon", preRaid and preRaid.enabled
+        and preRaid.text == "Pre-raid BiS" and naowh and not naowh.enabled and naowh.text:find("coming soon", 1, true))
+    preRaid.pick("preRaid")
+    local now = L.CurrentSpec()
+    local picks, backups = B.Rankings.PreRaid(now.key)
+    check("Pre-raid BiS asks which spec's picks, the one on show first", specPick:IsShown()
+        and specPick._get() == now.key and next(picks) ~= nil)
+    box:SetText("Pre-raid")
+    buttons.Create()
+    local made, same = L.List(), true
+    for slot, id in pairs(picks) do
+        if made.slots[slot] ~= id then same = false end
+    end
+    local backupSlot = next(backups)
+    check("Create makes the list from the spec's pre-raid picks and their backups", made.name == "Pre-raid" and same
+        and (not backupSlot or made.extra[backupSlot][1] == backups[backupSlot][1]))
+    local twice = false
+    for slot, partner in pairs({ [11] = 12, [12] = 11, [13] = 14, [14] = 13 }) do
+        for _, id in ipairs(backups[slot] or {}) do
+            if id == picks[partner] then twice = true end
+        end
+    end
+    check("never the same ring or trinket twice, nor as the other's backup", (not picks[11] or picks[11] ~= picks[12])
+        and (not picks[13] or picks[13] ~= picks[14]) and not twice)
+    check("no off hand under a two-handed main hand", not (picks[16] and ns.Shared.Items.IsTwoHand(picks[16]))
+        or picks[17] == nil)
 end
 
 do

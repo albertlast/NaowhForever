@@ -14,7 +14,7 @@ local function Check(ok, label) assert(ok, label); checks = checks + 1 end
 
 local panelSrc = Read("NaowhForever_QoL/Interface/MapPinsPanel.lua")
 local townSrc = Read("NaowhForever_QoL/Interface/TownMap.lua")
-for _, key in ipairs({ "townCapitalsOnly", "townMinimap", "townMinimapSpirit", "townSpiritHealers", "townZoneLinks", "townTravel",
+for _, key in ipairs({ "townCapitalsOnly", "townMinimap", "townMinimapSpirit", "townMinimapNPCs", "townSpiritHealers", "townZoneLinks", "townTravel",
     "townClass", "townProfession", "townFlight", "townInn", "townBank", "townRepair", "townSupplies",
     "townStable", "townVendors", "townMail" }) do
     Check(townSrc:find('key = "' .. key .. '"', 1, true), "in the pin list: " .. key)
@@ -247,6 +247,13 @@ local env = setmetatable({
         overlayFrames = { MapButton(-4), MapButton(-36), { IsShown = function() return true end,
             GetNumPoints = function() return 1 end, GetPoint = function() return "BOTTOMLEFT", canvas, "BOTTOMLEFT", 0 end } } },
 }, { __index = _G })
+-- The button is the shared logo button (Shared/UI/Parts.lua): a Button that runs its click.
+ns.Shared.Parts = ns.Shared.Parts or {}
+function ns.Shared.Parts.LogoButton(parent, onClick)
+    local logoButton = env.CreateFrame("Button", nil, parent)
+    logoButton:SetScript("OnClick", onClick)
+    return logoButton
+end
 local chunk = assert(loadstring(Read("NaowhForever_QoL/Interface/MapPinsPanel.lua")))
 setfenv(chunk, env)
 chunk()

@@ -130,6 +130,7 @@ local function StepLoot(delta)
     D.lootIndex = D.lootIndex + delta
     if D.lootIndex < 1 then D.lootIndex = #D.loots end
     if D.lootIndex > #D.loots then D.lootIndex = 1 end
+    D.armed = false
     D.Paint()
 end
 
@@ -266,7 +267,7 @@ local function ConfirmLabel(pick)
 end
 
 local function ButtonLabel(loot, pick)
-    if D.armed then return ConfirmLabel(pick) end
+    if D.armed and not D.armedForced then return ConfirmLabel(pick) end
     if loot then return TEXT.DESTROY_LOOT end
     return TEXT.DESTROY_ONLY
 end
@@ -317,21 +318,15 @@ local function FitCards(showLoot)
     destroyCard:SetWidth(POPUP_W - PAD * 2)
 end
 
-local function RememberArmed(pick)
-    if not (pick and pick.bag == D.armedBag and pick.slot == D.armedSlot and pick.itemID == D.armedID) then
-        D.armed = false
-    end
-    if D.armed and pick then
-        D.armedBag, D.armedSlot, D.armedID = pick.bag, pick.slot, pick.itemID
-    else
-        D.armedBag, D.armedSlot, D.armedID = nil, nil, nil
-    end
+local function RememberArmed(pick, loot)
+    if D.armed and D.ArmedStill(pick, loot) then return end
+    D.Disarm()
 end
 
 function D.Paint()
     if not popup then return end
     local pick, loot = D.picks[D.index], D.loots[D.lootIndex]
-    RememberArmed(pick)
+    RememberArmed(pick, loot)
     local showLoot = loot ~= nil
     FitCards(showLoot)
     FillCard(destroyCard, pick, TEXT.BLANK_DESTROY, D.index, D.pending and 0 or #D.picks)
@@ -351,7 +346,7 @@ function D.Paint()
             noteText = TEXT.NOT_WORTH
             if S.Get("destroyCheapestAnyway") then
                 showAnyway = true
-                ns.SetButtonText(anywayBtn, D.armed and ConfirmLabel(pick) or TEXT.ANYWAY)
+                ns.SetButtonText(anywayBtn, D.armed and D.armedForced and ConfirmLabel(pick) or TEXT.ANYWAY)
             end
         else
             showButton = true
@@ -791,7 +786,7 @@ Settings.Page("QoL/Loot & Items", S):Card({
         { key = "destroyCheapestConsumable", label = "Consumables", toggle = true,
           help = "Also offers consumables a vendor will not buy. Ones with a vendor price are offered anyway." },
         { key = "destroyCheapestAll", label = "All Items", toggle = true,
-          help = "Offers every item in your bags except ones on the ignore list." },
+          help = "Offers every quality and zero-vendor item, but keeps protected and ignored items." },
         Settings.Group("Popup"),
         { key = "destroyCheapestSide", label = "Beside the Loot Window", choice = SIDES,
           help = "Where the popup sits beside the loot window, until you drag it." },

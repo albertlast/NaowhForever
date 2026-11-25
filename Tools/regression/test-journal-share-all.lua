@@ -38,6 +38,7 @@ local function Fixture(opts)
     local J = Data()
     J.Sharing = {}
     local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.upper, Lower = string.lower,
+        OnApply = function() end,
         Journal = J, Shared = {},
         Print = function(text) seen.printed[#seen.printed + 1] = text end,
         CanPlaceWaypoint = function() return true end,

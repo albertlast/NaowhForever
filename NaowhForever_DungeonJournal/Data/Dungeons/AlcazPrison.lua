@@ -14,7 +14,7 @@ ns.Journal.AddDungeon("AlcazPrison", {
             { npc = 257016, name = "Katerina the Cleaner", model = 2317, encounters = { 3418 }, loot = { 276740, 276738, 276739 }, chance = { 35, 33, 31 } },
             { npc = 256236, name = "The Questioner", model = 140092, encounters = { 3415 }, loot = { 276743, 276741, 276742 }, chance = { 36, 32, 30 } },
             { npc = 255702, name = "Blazeroar", model = 6374, encounters = { 3409 }, loot = { 276744, 276746, 276745 }, chance = { 35, 34, 29 } },
-            { npc = nil, name = "Trash", trash = true, loot = { 287021, 287019, 287018, 287020, 287017, 287022, 287023, 287024, 287025 } },
+            { npc = nil, name = "Trash", trash = true, loot = { 287021, 287019, 287018, 287020, 287017, 287022, 287023, 287024, 287025, 287026 } },
         } },
     },
 })

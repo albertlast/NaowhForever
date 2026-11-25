@@ -780,7 +780,7 @@ do
     check("Fade off: it comes back at once, no breathing", alert.shown == true and not alert.breathe.playing)
     s.S.Set("campAlertFade", true)
     s.S.Set("campStyle", "simple")
-    check("Simple: the alert hides, the bar's own pill covers it", alert.shown == false and bar.pill
+    check("Simple: the alert stays, beside the bar's own pill", alert.shown == true and bar.pill
         and Plain(bar.note.text) == "Camp Nearby" .. s.St.PLACE_DOT .. "click to sit")
     pos = s.S.Get("campPos")
     check("switching to Simple puts the bar's fire where the icon was", pos.point == "LEFT" and pos.x == 288
@@ -1321,7 +1321,7 @@ do
         and alert.shown == true and alert.bar.time.shown ~= false and not bar.pill)
     s.auras[CAMP] = nil
     s.fire("UNIT_AURA")
-    check("Simple, camp gone and a campfire in range: the bar's own pill, no alert", alert.shown == false
+    check("Simple, camp gone and a campfire in range: the alert and the bar's own pill", alert.shown == true
         and bar.pill and Plain(bar.note.text) == "Camp Nearby" .. s.St.PLACE_DOT .. "click to sit")
     s.auras[CAMP] = { duration = 3600, expirationTime = s.now + 1800, auraInstanceID = 2 }
     s.fire("UNIT_AURA")
@@ -1334,6 +1334,16 @@ do
     s.ns.ShowUnlockMode()
     check("Simple: Unlock Mode shows the alert to move", alert.shown == true)
     s.ns.HideUnlockMode()
+end
+
+do
+    local s = Fixture({ campStyle = "simple", campShowMissing = false })
+    s.fire("PLAYER_LOGIN")
+    s.auras[NEARBY] = {}
+    s.fire("UNIT_AURA")
+    local alert = s.named.NaowhForeverCampNearby
+    check("Simple, no Refresh Reminder, camp gone and a campfire in range: the Camp Nearby alert, the bar hidden",
+        alert and alert.shown == true and s.named.NaowhForeverCampfire.shown == false)
 end
 
 do
@@ -1504,8 +1514,8 @@ do
     check("Enable Glow off stops either", s.glows[icon] == nil)
 end
 
--- The Sleeping Bag: a smaller round icon at Round's lower right, only while the bag is carried and
--- a campfire is in range (or you sit at one), a secure button that uses it, left alone in combat.
+-- The Sleeping Bag: a smaller round icon at Round's lower right or past the Simple bar's right end,
+-- only while the bag is carried and a campfire is in range (or you sit at one), a secure button that uses it, left alone in combat.
 do
     local BAG = tonumber(Read("Shared/Game/Items.lua"):match("local SLEEPING_BAG = (%d+)"))
     local s = Fixture()
@@ -1661,13 +1671,19 @@ do
     s.S.Set("campShowMissing", true)
     check("bag: the fire back, the bag with it", icon.shown and bag.shown)
     s.S.Set("campStyle", "simple")
-    check("bag: Round only, never on the Simple bar", not bag.shown)
-    check("bag: Simple listens to no bag events", not s.listener("BAG_UPDATE_DELAYED")
-        and not s.listener("BAG_UPDATE_COOLDOWN"))
-    s.S.Set("campStyle", "round")
-    check("bag: Round again, it is back", bag.shown)
-    check("bag: Round listens to bag events again", s.listener("BAG_UPDATE_DELAYED") ~= nil
+    local height = s.S.Get("campSimpleHeight")
+    check("bag: on the Simple bar too, as tall as the bar, without its label", bag.shown
+        and bag.w == height and not bag.label.shown)
+    check("bag: just past the bar's right end, level with it",
+        bag.pt.CENTER == 500 + (icon.w + height) / 2 + St.CAMP_TRACK_OUT + St.CAMP_BAG_GAP and bag.pty.CENTER == 300)
+    check("bag: Simple listens to bag events", s.listener("BAG_UPDATE_DELAYED") ~= nil
         and s.listener("BAG_UPDATE_COOLDOWN") ~= nil)
+    s.S.Set("campSimpleHeight", 40)
+    check("bag: a new bar height resizes it", bag.w == 40)
+    s.S.Set("campSimpleHeight", height)
+    s.S.Set("campStyle", "round")
+    check("bag: Round again, beside the round fire with its label", bag.shown
+        and bag.w == 80 * St.CAMP_BAG_SCALE and bag.label.shown)
     s.ns.ShowUnlockMode()
     check("bag: in Unlock Mode it shows with its own mover", bag.shown and bag.mover.shown)
     s.ns.HideUnlockMode()

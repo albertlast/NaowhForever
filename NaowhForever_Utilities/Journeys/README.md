@@ -37,7 +37,10 @@ NaowhForever_Utilities/Journeys/
   `ns.JourneyDetails` lets `ns.ClearGuideWaypoint` end it even before its first step is placed.
 - A step is placed with `ns.ShowJourneyStep`, the game's own waypoint, so the Waypoint Pin draws it.
   `ns.WaypointRoute` reports the journey, so the pin does not clear a step on arrival and its navigator
-  shows "step N of M" and the next step.
+  shows "step N of M" and the next step. `Guide.Skip` (`ns.JourneySkip`, from the navigator's skip)
+  moves a journey of several stops on to the next: the stop itself goes on the waypoint at once, so
+  a plan that cannot be made yet (on a boat, off the continents) never leaves the skipped stop up,
+  and the plan from where you stand replaces it.
 - The game clears a user waypoint itself when you reach it, from its arrival event, so a waypoint
   cleared in the same frame as `NAVIGATION_DESTINATION_REACHED` means arrived (or off the continents,
   where the journey holds). Any other clear is you removing the pin, and ends the journey; so does a
@@ -57,6 +60,9 @@ NaowhForever_Utilities/Journeys/
   game's tables give them, x north and y west.
 - `UnitPosition`'s height is a placeholder 0 (`NO_HEIGHT`), so a 0 is no height at all. Taken as a real
   one, the walk from where you stand started on the ground nearest sea level and cost its height in yards.
+- With no height, a spot over several separate levels of walking map stands on the one whose walk reaches
+  the most of the continent: the mountain over Ironforge is walking ground too, an island that walks
+  nowhere, and a journey into the city from it found no way at all.
 - Walking costs and paths come from the walking maps `Tools/nav` bakes from the client's terrain, in
   `NaowhForever_JourneysData`, a load-on-demand addon loaded on the first journey out of combat. Each
   tile is CBOR, deflated and in Base64, decoded by `C_EncodingUtil` when a walk first touches it; at

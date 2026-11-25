@@ -16,6 +16,7 @@ local ROW_POINTS = 5
 local NODE_SPELL, NODE_RANKS, NODE_ROW, NODE_COLUMN, NODE_NEEDS = C.NODE_SPELL, C.NODE_RANKS, C.NODE_ROW, C.NODE_COLUMN, 6
 local DECODE_LIMITS = { maxChars = 100000, maxBytes = 1048576, maxDepth = 8, maxValues = 20000 }
 local BUILD_VERSION = 1
+local PASTE_MAX = 4000
 local NAOWH_KEY = "naowh"
 local TEXT_NOT_IN_TREE = ns.L("That talent is not in this class's tree.")
 local TEXT_ALL_SPENT = ns.L("All %d points are spent.")
@@ -25,6 +26,7 @@ local TEXT_TALENT_ABOVE = ns.L("the talent above it")
 local TEXT_NEEDS_POINTS = ns.L("Needs %d points in %s first.")
 local TEXT_NO_POINTS_YET = "No points yet"
 local TEXT_NOT_A_BUILD = ns.L("That is not a Naowh Forever talent build.")
+local TEXT_PASTE = ns.L("Paste a Naowh Forever talent build")
 local TEXT_ADD = ns.L("Add the %s build %s (%d points)?")
 local TEXT_IMPORTED = ns.L("Imported %s.")
 local TEXT_IMPORTED_BUILD, TEXT_IMPORTED_SPEC = ns.L("Imported Build"), ns.L("Imported")
@@ -79,12 +81,26 @@ function Training.Builds(classID)
     return list
 end
 
-function Training.Ranks(talents)
+function Training.Ranks(talents, withUnapplied, into)
     local config = C_ClassTalents.GetActiveConfigID()
     if not config then return nil end
-    local ranks = {}
-    for node in pairs(talents) do ranks[node] = C_Traits.GetNodeInfo(config, node).activeRank end
+    local ranks = into or {}
+    wipe(ranks)
+    for node in pairs(talents) do
+        local info = C_Traits.GetNodeInfo(config, node)
+        if withUnapplied then
+            ranks[node] = info.currentRank
+        else
+            ranks[node] = info.activeRank
+        end
+    end
     return ranks
+end
+
+function Training.Spent(ranks)
+    local total = 0
+    for _, rank in pairs(ranks) do total = total + rank end
+    return total
 end
 
 function Training.TalentEntry(classID, node)
@@ -244,6 +260,10 @@ function Training.ImportBuild(text, onAdded)
     end)
 end
 
+function Training.PromptImport(onAdded)
+    ns.PromptText(TEXT_PASTE, "", PASTE_MAX, function(text) Training.ImportBuild(text, onAdded) end)
+end
+
 local function RowOrder(tree)
     return function(a, b)
         local rowA, rowB = tree.talents[a][NODE_ROW], tree.talents[b][NODE_ROW]
@@ -370,6 +390,7 @@ local function BuildKey(classID, build)
         if b == build then return NAOWH_KEY .. i end
     end
 end
+Training.BuildKey = BuildKey
 
 local function FollowSlot()
     local guid = UnitGUID("player")
@@ -412,9 +433,7 @@ end
 local function Spent(classID)
     local ranks = Training.Ranks(ns.TrainingBuilds[classID].talents)
     if not ranks then return nil end
-    local total = 0
-    for _, rank in pairs(ranks) do total = total + rank end
-    return total
+    return Training.Spent(ranks)
 end
 
 function Training.LearnFollowed()

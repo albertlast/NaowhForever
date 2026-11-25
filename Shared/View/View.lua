@@ -121,8 +121,8 @@ function Engine:SectionToggle(title, count, open, onToggle)
     return self:Add("section", title, count, open, onToggle)
 end
 
-function Engine:SectionLink(title, linkText, onLink, linkArg)
-    return self:Add("section", title, nil, nil, nil, linkText, onLink, linkArg)
+function Engine:SectionLink(title, linkText, onLink, linkArg, firstText, onFirst)
+    return self:Add("section", title, nil, nil, nil, linkText, onLink, linkArg, nil, nil, firstText, onFirst)
 end
 
 function Engine:Note(text)

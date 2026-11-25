@@ -40,7 +40,7 @@ NaowhForever_QoL/
     SpellEfficiencyReport.lua  the Mana Efficiency window (ns.OpenSpellEfficiencyReport, /nf efficiency): every rank of your mana spells
     GlobalCopy.lua      /copy, and tooltip IDs with their copy shortcut (the card is Shared/UI/CopyCard.lua)
     HideClutter.lua     UI Clutter
-    UnitNames.lua       Names Over Heads: guild names, guild titles and player titles with player names
+    UnitNames.lua       Names Over Heads: guild names, guild titles, player titles, and pet, guardian and totem names
     HDR.lua             HDR: the game's HDR and Peak Brightness
     ConsoleVariables.lua  Console Variables: every console variable with its value and default in a window
                         (ns.OpenConsoleVariables), to change, export and import (ns.ImportConsoleVariables),
@@ -98,6 +98,7 @@ NaowhForever_QoL/
     GroupButtons.lua    On-Screen Buttons (Invite, your invite buttons, Invite All, Disband)
     FreeForAll.lua      Always Free for All, the party loot method while you lead
     LayerSwap.lua       Auto-Accept Layer Swap, confirming the game's layer swap prompt on joining a group
+    WhisperInvite.lua   Whisper Invite, inviting players who whisper you one of your words
     QuestProgress.lua   Announce Quest Progress, your quest objective updates said in party chat
     QuestLinks.lua      Quest Levels in Chat, the level on quest links said in chat
     QuestItems.lua      Quest Item Info, the quests an item is for on its tooltip, learned from your quest log
@@ -115,6 +116,7 @@ NaowhForever_QoL/
     XPTicker.lua        XP per Hour (ns.ResetXPTicker)
     XPBarFX.lua         the XP Bar's effects and hover breakdown (ns.XPBarFX)
     XPBar.lua           the XP Bar (ns.XPBarColor, ns.ResetXPBarSession, ns.ResetXPBarLayout)
+    WatchList.lua       Watch List: the reputations, currencies and items you pick, in a small window
   Loot/
     LootCard.lua        the one card on Loot & Items that Looting, Vendors, Auction Prices and Mail & Alts join
     DeleteConfirm.lua   Type DELETE For You, and the Looting card
@@ -137,7 +139,9 @@ NaowhForever_QoL/
     DestroyCheapestPopup.lua the bags-full popup, its ignore list and its settings card
     BagSpaceIgnore.lua  Bag Space's Ignore List window (ns.ShowBagSpaceIgnoreList)
     Alts.lua            your characters per realm and faction (ns.AltRealm, ns.AltList, ns.OpenForgetAltMenu)
-    LootFeed.lua        the Loot Feed, gold per hour and quick loot (ns.ResetLootFeedSession)
+    LootFeed.lua        the Loot Feed, gold per hour and quick loot (ns.ResetLootFeedSession, ns.LootFeed)
+    LootFeedSettings.lua the Loot Feed's settings card and the live preview it edits
+    LootRolls.lua       Loot Rolls: the group's choices, rolls and winner for each drop, in a small window
     Restock.lua         the Restock Reminder, Auto Repair and Auto Sell Junk
     GearReminders.lua   Gear Reminders: an icon while you wear Cloak of Hermitic Bliss in Wailing Caverns or a fishing pole, and the Argent Dawn Commission swap
     FishingData.lua     the Fishing spells by rank and the lures by the skill they add (ns.FishingData)
@@ -397,6 +401,10 @@ NaowhForever_QoL/
 - Names Over Heads writes the game's own `UnitNamePlayerGuild`, `UnitNameGuildTitle` and
   `UnitNamePlayerPVPTitle` and keeps nothing: the game saves them. Forever's options have no box for
   them (only your own, NPC and player names), and a row shows only where the client has its setting.
+  The friendly and enemy pet, guardian and totem names (`UnitNameFriendlyPetName` and its five
+  siblings) go back on at every login, so a value set from the card is kept in the account store
+  and put back once per session, at the first apply. A change made elsewhere in a session stands
+  until the next login. Nothing is kept until a player changes one.
 - In-game cinematics carry no ID, so one is known by the zone and subzone it plays in. Skipping
   one waits a frame so CinematicFrame has taken the start before it is cancelled.
 - Finishing a movie shows UIParent again, which combat lockdown would block, so a movie is never
@@ -505,6 +513,18 @@ NaowhForever_QoL/
   bags you are looking at.
 - Auction Prices keeps one price table per auction house (realm and faction), as prices differ;
   the key is worked out once because it is read on every item tooltip.
+- Random-suffix gear ("of the Bear") also keeps a price per variant: `house.suffixes`, item ID to the
+  variant's full name to its lowest buyout, with `house.suffixSeen` dating the ones seen since the last
+  scan as `house.seen` does. `ns.AuctionPrice(itemID, link)` answers a link whose suffix field is not 0
+  with its variant's price before anything else, TSM and Auctionator included, since theirs is the
+  item's; a variant never seen falls back to the item's price, the cheapest variant. Only weapons and
+  armour are checked in a fast scan, and only their rows ask for a link (`GetReplicateItemLink`).
+- The variant is keyed by its full name, as the link's brackets and `GetItemKeyInfo`'s `itemName` both
+  give it, because the link's suffix ID and the item key's `itemSuffix` are not documented to be the same
+  number. Unverified in game: that `itemName` carries the suffix on Forever; if it does not, browse and
+  search sightings simply never match a link and the fast scan's prices still do.
+- A full or page by page scan replaces the variants with its own, as it does the prices. The release's
+  prices are per item only, so they never price a variant: the feed would need a variant table of its own.
 - The house is the one you are at: your faction's, or the realm's Blackwater house (`Realm-Blackwater`)
   while the auction house is open at an auctioneer of neither faction. So a scan in Booty Bay is kept as
   Blackwater's and never overwrites your faction's prices, and closing the auction house goes back to
@@ -695,9 +715,9 @@ NaowhForever_QoL/
   window instead and keeps Blizzard's hidden or shrunk away; a scan behind it would spend the 15-minute fast
   scan its own scans want and replace its searches.
 - Age is whole days since the price's scan or the release's prices, never below 0 (the release's time can
-  run a little ahead of the realm's clock), and nil past 21 days, as Auctionator's is. A price is per item
-  ID, so a link's price ignores a random suffix ("of the Bear"); for that reason a weapon or armour link is
-  never exact, while any other priced item is.
+  run a little ahead of the realm's clock), and nil past 21 days, as Auctionator's is. A link with a
+  random suffix ("of the Bear") gets its variant's price when one is known; a weapon or armour link is exact
+  only then, since otherwise its price is the item's cheapest variant, while any other priced item is.
 - Other addons can ask for a price during their own load, before the player's faction is known, so
   `House()` remembers its key only once the faction is there; until then it uses the realm-only key, as
   before, without remembering it.
@@ -931,8 +951,10 @@ NaowhForever_QoL/
   as known when it is within `MASTER_REACH` (50 yards) of you, or your position is unreadable: flight
   masters stand within 11 yards of their node, and the druids' in Nighthaven is 345 yards from
   Moonglade's. So the reminder hides without opening the flight map, and does not mark the snapshot
-  complete. The snapshot is this character's GUID in `flightPoints` (`TAXIMAP_OPENED`), and opening
-  the map still replaces every node from `GetAllTaxiNodes`. A name cannot tell two characters apart.
+  complete. The snapshot is this character's GUID in `flightPoints` (`TAXIMAP_OPENED`). A node the map
+  shows unreachable is saved as unknown only if it is not known already: a point you learned reads
+  unreachable from any master with no way to it through the points you know, and replacing it made
+  the point's own town remind you again. A name cannot tell two characters apart.
 - Opening a flight map saves both its taxi map ID and the player's real continent in
   `seenMaps`. Classic and Forever use separate taxi maps: 1463 for Eastern Kingdoms (1415)
   and 1464 for Kalimdor (1414). `TAXI_MAPS` lets both the screen reminder and pin hint recognize
@@ -1108,20 +1130,28 @@ NaowhForever_QoL/
   on, and anything on this feature's ignore list. Bags, consumables, reagents, trade goods,
   miscellaneous items and unbound gear are offered when their quality is on and they have a
   vendor price. Consumables
-  starts on and also offers ones a vendor will not buy. All Items starts off. While it is on,
-  every item in your bags is offered except ones on this ignore list. An item whose price is not
+  starts on and also offers ones a vendor will not buy. All Items starts off. While it is on, the
+  quality switches and the vendor-price rule are skipped and profession bags are scanned too. Every
+  other item left out above stays left out, and so does anything on this ignore list. Keep Items
+  Worth More Than, on the Bag Clean-up card, also keeps a stack whose value, the one the list is
+  sorted by, is above it. All Items skips that limit too. An item whose price is not
   loaded yet is asked for once and added when it arrives. Bag Space does not have to be on.
   Nothing is destroyed on its own.
 - Every quality, including poor and common, asks for a second click on that same button. The
   first click prepares the delete and the button names that item ("Click again to destroy"
-  plus its link). A different item, or moving to another one, clears that confirmation. The
+  plus its link). That confirmation is for that slot, item, stack size and link, against the loot
+  shown, on that button. A different item, paging either card, a stack or link that changed, or
+  the other button (Destroy Anyway after Destroy, or the reverse) clears it. The
   second click is the one the game accepts: on this
   client `DeleteCursorItem` only runs from that hardware click, and a later confirm button cannot
   run it. If the game still opens its own delete window, it is left for the player and never
   accepted or typed for here. If the delete does not take and no window is open, the item is put
   back in its slot, so it is not left on the cursor. The addon says it was destroyed only after a
-  bag update shows that stack gone and the count dropped by that stack. The slot is read again at
-  the click. If it changed, nothing is deleted.
+  bag update shows that stack gone and the count dropped by that stack. At the second click the
+  slot is read again with live settings: the item, its link and stack, a plain bag unless All
+  Items is on, every item left out above, the quality and vendor-price rules, the vendor price
+  shown, and Keep Items Worth More Than. If any of it changed, nothing is deleted and the list is
+  rebuilt.
 - After the stack is gone, the loot is taken only when its window is still open, the slot still
   has the item, and the player is out of combat. Otherwise the message says to loot it again. A
   bank, mail, trade, vendor or quest window says "Loot it again after making room." on the
@@ -1560,7 +1590,7 @@ NaowhForever_QoL/
 - The map calls `CheckMouseButtonPassthrough` on every acquired pin, and its SetPassThroughButtons is protected: from our refresh it is blocked in combat. Town pins take no clicks, so clicks reach the map anyway; zone exits and docks are separate clickable pins, so the vendor and trainer pins stay click-through. A zeppelin tower's pin has a second destination on right click. Their click opens the map with `C_Map.OpenWorldMap`, out of combat only (it cannot be called in combat), never the map's `SetMapID`: written from addon code, the map's `mapID` stays tainted for the session, and the next map opened in combat blocks the quest pins' SetPassThroughButtons.
 - Forever has no map links of its own (`GetMapLinksForMap` returns nothing), so the exits come from `ZoneExits.lua`. `EXIT_SHRINK` (0.6) makes an exit arrow 40% smaller than a pin, so it stands no bigger than the others, and `EXIT_LENGTH` is its length in its own widths.
 - Vendors & Trainers Only in Cities (`townCapitalsOnly`) keeps vendors, trainers and the bank off questing maps. Flight masters, innkeepers and stable masters (`EVERYWHERE`) are what a traveller looks for in any town, so they show on every map with it on, except stable masters, which only a hunter (`STABLE_CLASS`) sees; so do mailboxes and spirit healers, which are what you look for out in the world.
-- `townMinimap` is the minimap's mailboxes and `townMinimapSpirit` its spirit healers: `townMinimap` once held both, so existing profiles keep their mailboxes.
+- `townMinimap` is the minimap's mailboxes and `townMinimapSpirit` its spirit healers: `townMinimap` once held both, so existing profiles keep their mailboxes. `townMinimapNPCs` adds the service NPCs the Show in Town rows pick, with the world map's faction and class rules but not Vendors & Trainers Only in Cities: the minimap only reaches the town you stand in.
 - On OpenMap's seamless map the town pins of the zones beside the map underneath show too (Shared/README.md, Why), but its zone exits only the map underneath's: on one seamless map the neighbours' exits only doubled the arrows at every border. A town pin keeps its own map, which its flight-master tooltip asks about.
 - Which town pins show is chosen on the map itself, from the Town Pins button (`MapPinsPanel.lua`), and only there: the long list of town pin types is what you pick while looking at the map. Everything else is on QoL's Map & Pins tab and only there: a Map Options card (id `mapOptions`) and a Map Pins card (id `townMap`: Town Pin Size, then each module's pins under its title). No setting is in both places but Town Pin Size. The Map Pins card's search words include every town pin's name, so the options search still leads there. The keys stay in the QoL store, so saved settings carry over. The button shows whenever QoL is on, since the drawer is also where a switch that is off is turned back on.
 - Map & Pins is the home of every map pin and map option: the town pins, QoL's own Unexplored Areas, Zone Levels, Fishing Levels and Skyborne Spots, Discovery's quests, rares, library books and Sleeping Bag steps, and the Dungeon Journal's entrances. Each of the last adds a section to `ns.Shared.MapPins` (`{ title, order, store, switch, rows, map }`), and `ns.Shared.MapPinSections()` hands them back by `order` (10 to 14 the map options, then the sections with no `order`, which count as 50, in load order, and Skyborne last at 60). A section's `title` is its group; one with no title continues the group above. Sections marked `map` (Unexplored Areas, Zone Levels, Fishing Levels, Quest Area Tint) are the Map Options card's rows, the rest follow Town Pin Size on Map Pins under their titles. Rows of another module's store are `lent`, so a card's Reset and changed count leave them to their module. A module that is not loaded adds nothing, and a section whose `hidden` says so is left off (Skyborne Spots for anyone not Skyborne). Drawer rows dim and lock while their `needs` fails: the town rows while Town Pins is off. A town row with a `class` shows only for that class (Stable Masters, hunters). The drawer has its own Town Pins switch, so the town pins can be turned back on from the map.
@@ -1698,6 +1728,7 @@ NaowhForever_QoL/
 - Follow Polestar is initially off and uses the same feed, from Polestar's public `Polestar.Nav.API` (Core/Integrations/Polestar/README.md). Polestar's Next Stop, on with it, pins the end of the leg Polestar's arrow is on (the flight master, then the landing) rather than the end of the trip.
 - One guide feeds the pin at a time: Follow Polestar and Follow RestedXP each grey out while the other is on and its guide is loaded, and while their own guide is missing or too old, with the reason on the row. A switch that is on is never greyed, so it can always be turned off. Turning one on turns the other off, even one whose guide is not loaded now: left on, it would come back on beside this one once its guide is turned on again. A switch left on whose guide is missing feeds nothing, holds the other back from nothing, and notes why on its row.
 - The Navigator Bar's clear button lets go of a guide's destination through `ns.DismissGuideWaypoint`, so the feed that placed it can tell its guide (Polestar hides that goal until it moves on); any other waypoint clears as before.
+- On a route's stop with another after it (`ns.WaypointRouteCanSkip`), the Navigator Bar shows a skip button beside the clear, which places the next stop (`ns.WaypointRouteSkip`). It is read when the target changes, so it goes on the last stop.
 - The card's rows are in two groups, Guides and Display, so the two-column layout pairs Polestar's Next Stop with Follow Polestar, not with Follow RestedXP.
 - It follows the game's navigation frame (`C_Navigation`), so quests, your corpse and map pins get it as well as `ns.PlaceWaypoint`'s spots, which it names. A user waypoint counts as ours when it lies within `SAME_SPOT` (map percent) of `ns.placedWaypoint`.
 - A map pin's or corpse's navigation point is the spot on the ground: the ring at the line's foot goes there and the pin stands above it. A quest giver's is over their head, where the pin goes as it is, with no line down.
@@ -1709,7 +1740,7 @@ NaowhForever_QoL/
 - Behind you is the game's clamped spot within `BEHIND` of straight down, not the oval's: a spot low on screen past the oval is in front of you.
 - `BEHIND` is the angle either side of straight down that counts as behind you. `FAR` is the distance at which the pin is smallest (`FAR_SCALE`), and `FADE_FLOOR` its alpha at your feet with Fade Up Close on.
 - The game places a waypoint you click on the map without tracking it (its map code calls `SetSuperTrackedUserWaypoint(false)` right after `SetUserWaypoint`), and the pin only follows what is tracked, so on `USER_WAYPOINT_UPDATED` it tracks the new waypoint itself: one frame later with the map closed (the game's own untracking has run by then), or one frame after the map closes (`trackOnMapClose`), since setting one with the map open taints it. Not inside the map's OnHide: in the Gamepad interface style the controller's Back closes the map from secure code, which then removes the map's gamepad bindings, so tracking from Naowh's hook there got that secure code blocked (`SetPreferredGamepadInteractTarget`, then again at the next radial). Already tracked, it leaves it.
-- A waypoint you set has no held arrival: reaching it plays the sound and the pin, cue and bar go at once. A quest, the corpse and a route's stop hold the arrival where the pin last stood for `ARRIVED_HOLD` (a route's names the next stop). The game clears a waypoint you set as you reach it, its navigation frame going too, before or after NAVIGATION_DESTINATION_REACHED; that event's `isWaypoint` is a stop on the way (a zone's exit), not the spot itself. A waypoint you set does not wait for it: on the waypoint's map or one inside it (a waypoint placed on a continent still counts in its zones; the game routes a waypoint on another map through stops on the way, such as a zone's exit, which are not the spot), within Arrival Distance of its spot once the pin has seen you more than `LEAVE_MARGIN` past it, or within `REACHED` (5 yards) once it has seen you more than `LEAVE_MARGIN` past that, since the waypoint was attached or placed (a new waypoint can report no distance at first, and one placed under you has nothing to reach; other tracking changes on the way do not reset it), the pin shows the arrival and clears the waypoint itself, so it goes even when the game sends no arrival, or sends it as a stop. The game's event, when it does come first, clears it before the pin does. It does this once per waypoint (`selfCleared`: with the world map open the clear is held, and the pin must not arrive again every hold), and never on a route's stop, which moves on by the game's arrival event: clearing it would end the route. The `REACHED` fallback keeps a waypoint placed inside a long Arrival Distance from clearing at once.
+- A waypoint you set has no held arrival: reaching it plays the sound and the pin, cue and bar go at once. A quest, the corpse and a route's stop hold the arrival where the pin last stood for `ARRIVED_HOLD` (a route's names the next stop). The game clears a waypoint you set as you reach it, its navigation frame going too, before or after NAVIGATION_DESTINATION_REACHED; that event's `isWaypoint` is a stop on the way (a zone's exit), not the spot itself. A waypoint you set does not wait for it: on the waypoint's map or one inside it (a waypoint placed on a continent still counts in its zones; the game routes a waypoint on another map through stops on the way, such as a zone's exit, which are not the spot), within Arrival Distance of its spot once the pin has seen you more than `LEAVE_MARGIN` past it, or within `REACHED` (5 yards) once it has seen you more than `LEAVE_MARGIN` past that, since the waypoint was attached or placed (a new waypoint can report no distance at first, and one placed under you has nothing to reach; other tracking changes on the way do not reset it), the pin shows the arrival and clears the waypoint itself, so it goes even when the game sends no arrival, or sends it as a stop. The game's event, when it does come first, clears it before the pin does. It does this once per waypoint (`selfCleared`: with the world map open the clear is held, and the pin must not arrive again every hold), and never on a route's stop, which it tells the route about instead (`ns.WaypointRouteReached`): clearing it would end the route. The `REACHED` fallback keeps a waypoint placed inside a long Arrival Distance from clearing at once.
 - Nothing tracked means cleared or reached. A clear can leave the navigation frame up with no NAVIGATION_FRAME_DESTROYED, which used to leave the navigator showing.
 - The game's own marker keeps setting its frame's alpha, so Hide the Game's Marker fades its parts (`GAME_PARTS`) instead.
 - With no waypoint, Unlock Mode still shows the navigator on a sample, to place it by.
@@ -1757,6 +1788,14 @@ NaowhForever_QoL/
 - The window stays full size whenever something would be left for the player: a group roll, a locked item, or bags too full. An item that tops up a stack already in the bags needs no free slot, so full bags alone do not bring the window back. Still open `LOOT_GRACE` (1 s) after the last slot, something could not be taken, so the window comes back. Only a full-bags error during a loot matters, so errors are listened to only while one is open.
 - The window gets its size back after its close animation finishes, so it never flashes on the way out.
 - A Spacing of -1 lets neighbouring lines share one border.
+
+### Loot Rolls
+- Everything comes from the game's loot history (`LOOT_HISTORY_UPDATE_DROP`, `C_LootHistory.GetSortedInfoForDrop`): it already sorts the rolls (Need, then Greed, then Pass, then those still choosing) and names the leader and the winner. The combat log is closed on Forever and chat roll lines are worded per language, so neither is read.
+- It is its own window, not a part of the game's roll frames: those close the moment you click Need, Greed or Pass, before anyone else has rolled.
+- A drop stays `KEEP_SETTLED` (60 s) after it is won or everyone passed, and at most `KEEP_OPEN` (5 min) while it never settles (you left the group). Past `MAX_DROPS` (8) the oldest settled drops go first; one still being rolled on stays until it settles or times out, so it never drops out and comes back.
+- The drop's IDs, its link and every player's name and class are checked with `issecretvalue` first, as the Dungeon Journal reads the same history; a drop or a player the game keeps secret is left out.
+- Close hides the drops on screen for good, even while they are still rolled on; the next new drop brings the window back.
+- Each shown drop sets a timer for `KEEP_OPEN` when it first shows and another for `KEEP_SETTLED` when it settles; a timer that finds nothing old enough does nothing.
 
 ### XP Bar
 - Its colors: Naowh's blue for the fill, his logo's gold for quest XP, a darker blue for rested. A color the player picked wins; an unset one follows the theme, and the shipped one while the theme leaves the accent alone. `FILL_DARK` is how dark the fill's left end is against its color, `RESTED_DARK` how dark rested is against a theme's changed accent. A theme turns quest XP to its lighter accent, which reads apart from the fill, and the black border to its line color. Incomplete quests, unpicked, are the completed quests color faded over the background (`OPEN_ALPHA`), as its swatch shows it.
@@ -1834,6 +1873,16 @@ NaowhForever_QoL/
 - The pace arrow sits a share of the text size lower (`DROP_SHARE`), level with the letters: the Naowh font leaves room above capitals.
 - The file sits close to Lua 5.1's 200-local cap for one chunk, so new constants are grouped into tables (`FORMAT`, `DEFAULT_POS`); the XP Bar folds its texts into `TEXT` for the same reason.
 
+### Watch List
+- What is watched is one list in the QoL store (`watchListItems`), each entry `f:<factionID>`, `c:<currencyID>` or `i:<itemID>`, in the order shown. It is saved with the profile. Every change saves a new copy of the list, never the stored default.
+- Reputations and currencies are picked from the game's own lists (`C_Reputation.GetFactionDataByIndex`, `C_CurrencyInfo.GetCurrencyListInfo`), which leave out what sits under a collapsed header. The picker says so on that header rather than expanding it: expanding changes the game's Reputation and Currency windows for the player.
+- Items count your bags plus the bank Alts.lua saves (`ns.BankCount`), as the Loot Feed does: `C_Item.GetItemCount`'s bank flag leaves the bank out on Forever. The Watch List turns that bank scan on while it is on, and listens to bag changes only while an item is watched.
+- `UPDATE_FACTION`, `CURRENCY_DISPLAY_UPDATE` and the bag events are folded into one redraw on the next frame. A kill can send several of them at once.
+- An item the client has not loaded shows the shared unloaded name until its data arrives (`Items.OnLoaded`), then redraws.
+- Close hides the window until the next login or reload, or until the switch is turned off and on again. Unlock Mode still shows it.
+- Lock Window (`watchListLock`) stops the title and body drags; Unlock Mode's mover still moves it, so a locked window can be placed without turning the lock off.
+- Progress Bars (`watchListBars`, off by default) puts a bar under each reputation (the standing's progress in its colour, full at Exalted) and under each currency with a cap. Items and uncapped currencies have no bar.
+- The standing colours are the Dungeon Journal's, moved into `Shared/Style.lua` (`STANDING_RGB`) so both read one copy.
 
 ### Always Free for All
 - Raids are left alone: a raid usually sets its own loot rules.
@@ -1926,6 +1975,10 @@ NaowhForever_QoL/
   it on or off. While Glimmer is on, the cog ignores its nameplate's scale and is drawn `COG_SIZE`
   wide at the UI's scale, and is given back when the soft target or its nameplate changes or Glimmer
   is turned off. A scale on an unprotected frame is allowed in combat, so it holds there too.
+- Hide Icon Above Objects fades the cog's `SoftTargetFrame` to alpha 0 instead of turning
+  `SoftTargetIconGameObject` off, which would take the nameplate and the effect with it. The game
+  only shows and hides the frame's `Icon`, never the frame's alpha, so the fade holds; the alpha is
+  given back with the scale, since nameplate frames are reused.
 - The nameplate is only opened for an object Glimmer lights (`onlyHighlighted`), so NPCs, mailboxes
   and doors do not grow a nameplate. Whether to open it does not need the nameplate: the object is
   read from the unit token, then the nameplate arrives with `NAME_PLATE_UNIT_ADDED`.

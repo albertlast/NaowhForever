@@ -381,6 +381,19 @@ function Guide.Cancel()
     Changed()
 end
 
+function Guide.CanSkip()
+    return journey ~= nil and journey.at < #journey.stops
+end
+
+function Guide.Skip()
+    if not Guide.CanSkip() then return false end
+    journey.at = journey.at + 1
+    journey.plan = nil
+    StopStep()
+    Replan()
+    return true
+end
+
 function Guide.Current()
     return journey
 end
@@ -442,6 +455,8 @@ end
 
 ns.JourneyTo = Guide.Start
 ns.JourneyCancel = Guide.Cancel
+ns.JourneyCanSkip = Guide.CanSkip
+ns.JourneySkip = Guide.Skip
 ns.JourneyStep = Guide.Step
 ns.JourneyDestination = Guide.Destination
 ns.JourneyDetails = Guide.Details

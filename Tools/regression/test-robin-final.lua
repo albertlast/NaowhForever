@@ -5,11 +5,11 @@ local checks = 0
 local function check(label, value) assert(value, label); checks = checks + 1 end
 local function fixture(kind)
     local state = { combat = false, secret = false, now = 1000, bags = { 101, 202, 101, 303 },
-        settings = { gearSets = true, gearBarVisible = false, trinketBar = true,
+        settings = { gearSets = true, gearBarVisible = false, trinketBar = true, trinketPickerSide = 'above',
             trinketSize = 36, trinketSpacing = 4, gearBarSize = 32, gearBarSpacing = 4, gearBarShow = 'always',
             gearMounted = '', gearResting = '', gearDrinking = '', gearDungeon = '', gearRaid = '', gearBattleground = '',
             gearForms = {} },
-        frames = {}, named = {}, timers = {}, equips = {} }
+        frames = {}, named = {}, timers = {}, equips = {}, empty = {} }
     local function frame(name, parent, template)
         local f = { scripts = {}, events = {}, shown = true, parent = parent, attributes = {},
             secure = template == 'SecureActionButtonTemplate' or name == 'NaowhForeverTrinkets' }
@@ -101,8 +101,8 @@ local function fixture(kind)
         GetTime = function() return state.now end,
         IsInInstance = function() return false end,
         IsMounted = function() return false end, IsResting = function() return false end,
-        GetInventoryItemTexture = function(_, slot) return slot + 1000 end,
-        GetInventoryItemID = function(_, slot) return slot + 2000 end,
+        GetInventoryItemTexture = function(_, slot) if not state.empty[slot] then return slot + 1000 end end,
+        GetInventoryItemID = function(_, slot) if not state.empty[slot] then return slot + 2000 end end,
         GetInventoryItemCooldown = function(_, slot)
             local cd = state.cooldowns and state.cooldowns[slot]
             if cd then return cd[1], cd[2], 1 end
@@ -128,6 +128,11 @@ local function fixture(kind)
         C_Container = {
             GetContainerNumSlots = function() return #state.bags end,
             GetContainerItemID = function(_, slot) return state.bags[slot] end,
+            GetItemCooldown = function(id)
+                local cd = state.itemCooldowns and state.itemCooldowns[id]
+                if cd then return cd[1], cd[2], 1 end
+                return 0, 0, 1
+            end,
         },
         C_Item = {
             GetItemInfoInstant = function(id) return id, nil, nil, id == 303 and 'INVTYPE_HEAD' or 'INVTYPE_TRINKET' end,
@@ -236,6 +241,30 @@ end
 
 do
     local s = fixture('gear')
+    s.empty = { [14] = true }
+    s.loadModule('NaowhForever_Combat/GearSets'); s.fire('PLAYER_LOGIN')
+    local bar = s.named.NaowhForeverTrinkets
+    check('an empty trinket slot is left off the bar', #bar.buttons == 1 and bar.buttons[1] == s.named.NaowhForeverTrinket1
+        and bar.shown)
+    check('and the bar keeps its placed size, so the slot left does not move', bar.width == 2 * 36 + 4)
+    s.empty = { [13] = true, [14] = true }
+    local watcher
+    for _, f in ipairs(s.frames) do if f.events.PLAYER_EQUIPMENT_CHANGED and f.events.PLAYER_REGEN_DISABLED then watcher = f end end
+    watcher.scripts.OnEvent(watcher, 'PLAYER_EQUIPMENT_CHANGED', 13)
+    check('no trinket worn: the bar hides', #bar.buttons == 0 and not bar.shown
+        and not s.named.NaowhForeverTrinket1.shown)
+    s.ns.ShowUnlockMode()
+    check('Unlock Mode shows every slot, to place the bar', bar.shown and #bar.buttons == 2)
+    s.ns.HideUnlockMode()
+    check('and hides them again after', not bar.shown)
+    s.empty = { [13] = true }
+    watcher.scripts.OnEvent(watcher, 'PLAYER_EQUIPMENT_CHANGED', 14)
+    check('putting one on brings the bar back with it', bar.shown and #bar.buttons == 1
+        and bar.buttons[1] == s.named.NaowhForeverTrinket2)
+end
+
+do
+    local s = fixture('gear')
     s.settings.gearBarVisible, s.settings.trinketBar = true, false
     s.setIDs = { 1, 2 }
     s.loadModule('NaowhForever_Combat/GearSets'); s.fire('PLAYER_LOGIN')
@@ -296,6 +325,27 @@ do
     check('a trinket on cooldown sweeps', top.shown and top.cooldown[1] == 900 and top.cooldown[2] == 120)
     check('a ready trinket shows no sweep', not bottom.shown)
     check('cooldown numbers on', top.hideNumbers == false)
+    s.itemCooldowns = { [101] = { 950, 60 } }
+    bar.buttons[1].scripts.PostClick(bar.buttons[1], 'RightButton', false)
+    local picker
+    for _, f in ipairs(s.frames) do if type(rawget(f, 'buttons')) == 'table' and rawget(f, 'close') then picker = f end end
+    local cooling, ready = picker.buttons[1].cooldown, picker.buttons[2].cooldown
+    check('a trinket in the picker on cooldown sweeps', cooling.shown and cooling.cooldown[2] == 60
+        and cooling.hideNumbers == false)
+    check('a ready one in the picker shows no sweep', not ready.shown)
+    check('the picker opens above the slot', picker.point[1] == 'BOTTOMLEFT' and picker.point[3] == 'TOPLEFT')
+    s.itemCooldowns[202] = { 990, 30 }
+    s.fire('BAG_UPDATE_COOLDOWN')
+    check('the open picker follows a new cooldown', ready.shown and ready.cooldown[2] == 30)
+    s.S.Set('trinketPickerSide', 'left')
+    check('changing the side closes the picker', not picker.shown)
+    bar.buttons[1].scripts.PostClick(bar.buttons[1], 'RightButton', false)
+    check('it opens on the left', picker.point[1] == 'TOPRIGHT' and picker.point[2] == bar.buttons[1]
+        and picker.point[3] == 'TOPLEFT' and picker.point[4] < 0)
+    s.S.Set('trinketPickerSide', 'below')
+    bar.buttons[1].scripts.PostClick(bar.buttons[1], 'RightButton', false)
+    check('or below', picker.point[1] == 'TOPLEFT' and picker.point[3] == 'BOTTOMLEFT' and picker.point[5] < 0)
+    picker:Hide()
     s.fire('PLAYER_REGEN_DISABLED'); s.combat = true
     s.cooldowns[14] = { 1000, 30 }
     s.fire('BAG_UPDATE_COOLDOWN')
@@ -310,6 +360,8 @@ do
     local listening = false
     for _, f in ipairs(s.frames) do if f.events.BAG_UPDATE_COOLDOWN then listening = true end end
     check('cooldowns off: no sweeps and no cooldown events', not top.shown and not bottom.shown and not listening)
+    bar.buttons[1].scripts.PostClick(bar.buttons[1], 'RightButton', false)
+    check('cooldowns off: none in the picker either', not picker.buttons[1].cooldown.shown)
     local icon = bar.buttons[1].icon
     check('trinket icons keep their rounded edges by default', icon.crop == 0)
     s.S.Set('trinketSquare', true)

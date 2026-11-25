@@ -46,7 +46,6 @@ local LINK_GAP = 12
 local COST_GAP, COUNT_GAP, COUNT_LIFT = 10, 14, 4
 local BAR_GAP, NOTE_GAP = 14, 10
 local GOLD_GAP, SIXTY_GAP, SIXTY_TEXT_GAP = 10, 14, 6
-local PASTE_MAX = 4000
 local FONT_LABEL, FONT_COUNT, FONT_SIXTY, FONT_GOLD, FONT_COST = 12, 13, 16, 22, 30
 local FONT_TICK = 11
 local TEXT_TITLE = ns.L("Training Planner")
@@ -61,7 +60,6 @@ local TEXT_SHOW_LEARNED, TEXT_HIDE_LEARNED = ns.L("Show Learned"), ns.L("Hide Le
 local TEXT_ALL_LEVELS = ns.L("All Levels")
 local TEXT_IMPORT, TIP_IMPORT = ns.L("Import a Build"), ns.L("Paste a build someone shared with you.")
 local TEXT_IMPORT_LABEL = ns.L("Import")
-local TEXT_PASTE = ns.L("Paste a Naowh Forever talent build")
 local TEXT_SAVE, TIP_SAVE = ns.L("Save My Talents"), ns.L("Keep the talents you have now as a build "
     .. "you can export. The game does not keep the order you took them in, so it lists them row by row.")
 local TEXT_NAME_TALENTS = ns.L("Name for your current talents")
@@ -235,7 +233,7 @@ local function ShowBuild(classID, index)
 end
 
 local function Import()
-    ns.PromptText(TEXT_PASTE, "", PASTE_MAX, function(text) Training.ImportBuild(text, ShowBuild) end)
+    Training.PromptImport(ShowBuild)
 end
 
 local function SaveTalents()

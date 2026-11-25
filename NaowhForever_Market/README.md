@@ -3,7 +3,9 @@
 At the auction house The Market is a panel docked to the right of Blizzard's own window, which stays
 exactly as the game draws it. The panel has four tabs, and follows Blizzard's own. Buy is your Watch List:
 search your scans for an item, give it a price, and each scan tells you in chat when it is at or under it. Its
-Searches view keeps named lists of searches and the last ones you ran; a click runs one in Blizzard's own Buy tab. Sell lists your bags most valuable first, puts the
+Searches view keeps named lists of searches and the last ones you ran; a click runs one in Blizzard's own Buy tab. With
+Cheap Upgrades on, its Upgrades view lists the gear in your scans that beats what you wear, at or under a price you set,
+biggest upgrade first; a click searches for it. Sell lists your bags most valuable first, puts the
 item in front of you at a price one step under the cheapest listing that is not yours, says how it
 compares, and posts it with the Post button, or with Space (post), S (skip) and Up and Down (the next
 price step) once Post With Keys is on. Under the form it lists the item's listings, cheapest first, with where
@@ -54,6 +56,7 @@ NaowhForever_Market/
   Watch.lua          the items you watch for a price, and the chat line when one is at or under it (Market.Watch)
   Results.lua        what the auction house's last browse search found, however it was sent bar a price scan's, and more as you scroll (Market.Results)
   Searches.lua       your searches in named lists and the last ones you ran, run in Blizzard's Buy tab, and a list as a string to share (Market.Searches)
+  Upgrades.lua       the gear in your scans that would make you stronger than what you wear, at or under your price (Market.Upgrades)
   Worth.lua          what your bags would fetch, their most valuable items, and the best way to sell an item (Market.Worth)
   Bank.lua           what your bank held when you last had it open, kept for each character, and what it would fetch (Market.Bank)
   Crafts.lua         your characters' known recipes priced at their best outlet, and what your bags make (Market.Crafts)
@@ -81,7 +84,7 @@ NaowhForever_Market/
     Prices.lua       the Price Graph page: any item in your scans by name, from your bags, a writ filter or the movers, and its price chart
     Ledger.lua       the Ledger page: gold over time and what was earned and spent, and the sales, purchases, other gold and failed auctions as lists
     Searches.lua     the Buy page's Searches view: a saved list or Recent, run with a click, kept and edited from menus (Market.SearchView)
-    Buy.lua          the Buy page: your Watch List with any item in your scans to add to it, or your saved searches, and in the full window Browse beside them
+    Buy.lua          the Buy page: your Watch List with any item in your scans to add to it, your saved searches, or Cheap Upgrades' gear, and in the full window Browse beside them
     Shopping.lua     the Shopping List page: yours and your alts' materials still to buy, counted when bought, and the picked one's listings with Buy
     Move.lua         Shift + drag moving Blizzard's auction house, and keeping it there (Market.Move)
     HouseTabs.lua    the Farm, Price Graph, Reagents and Ledger tabs under Blizzard's window, drawn as its own tabs (Market.HouseTabs)
@@ -89,6 +92,7 @@ NaowhForever_Market/
     BagWorth.lua     the Bag Worth card on your bags, with your bank if you ask, and the numbers on their most valuable slots
     Tooltip.lua      The Market's lines on item tooltips
     Mail.lua         what a mail's attachments would fetch at auction, one line on the inbox's own tooltip
+    Collect.lua      the Collect button beside the inbox: all mail, or only sold, bought or expired auctions
     SettingsPage.lua the settings page, declared as cards
 ```
 
@@ -342,7 +346,9 @@ NaowhForever_Market/
   other item by its own item key, item level and suffix included. An auction's price is
   `buyoutAmount`, read as the price for one, as Blizzard's auctions list shows it.
 - An auction is undercut when the cheapest listing that is not yours is under its price. Under
-  `UNDERCUT_SMALL` (3%) it shows the amount in warning orange, more in red as a percent.
+  `UNDERCUT_SMALL` (3%) it shows the amount in warning orange, more in red as a percent. An item
+  (not a commodity) that someone else lists at exactly your price shows as Matched in orange rather
+  than Lowest, as a buyer may take theirs first; it is not counted as undercut.
 - `CancelAuction` needs a hardware event: each Cancel and each Cancel Undercut press cancels one
   auction. A row's Cancel asks first with `ns.Confirm`, whose Yes is the click that cancels. Cancel
   Undercut does not ask: its label says what it does and it cancels one per press. An auction once
@@ -475,6 +481,12 @@ NaowhForever_Market/
 - Start Loop hands the loop to the shared waypoint route (`ns.PlaceWaypointRoute`), which places the
   next stop as you reach each, so the loop is followed by the game's own waypoint arrow. Open Map opens
   the world map on the zone (`Shared.Places.ShowMap`).
+- A stop counts as reached within `LOOP_ARRIVE` (15) yards, as a Journeys stop does: a node's spot is
+  where it spawns, and you gather it from beside it or mounted. A gather or a pool catch within
+  `LOOP_GATHER_NEAR` (30) yards of the stop counts too (`Farm.Gathered`, only on the loop Start Loop
+  placed): once the node is picked there is nothing left to wait there for. Pools are learned where
+  you stood to fish, so a pool's stop is the shore. With Journeys on the loop is a journey, which
+  moves on at its own `ARRIVED` reach; gathers and the radius are for the plain route.
 - The zone map is drawn from the map's own art (`C_Map.GetMapArtLayers` and
   `GetMapArtLayerTextures`, laid out in tiles as Blizzard's map canvas does), scaled to fit and
   clipped. A spot gathered in the last `PICKED_FADE` (10) minutes is faded, its node likely gone.
@@ -552,6 +564,9 @@ NaowhForever_Market/
 - A list row is one number, its character's place in the list times `LEDGER_ROW_SHIFT` plus its index, so
   filtering and sorting thousands of rows makes no tables. The list builds only the rows in view, as
   Browse does.
+- Each list tab keeps its own Type (`ledgerKindSales` and the like, "" for All Types). The pass that
+  collects the rows notes every type that passes the name filter, so the Type list offers only those,
+  plus the picked one, and needs no second pass.
 - The first Buy page, with its Favourites and saved searches, is gone: Blizzard's own Buy tab is
   what players buy in. Its saved data (`marketFavourites`, `marketSearches`, `sortBuy`) and the old Open at
   the Auctioneer setting (`openAtAuctioneer`) are left as they were, unread; the Searches view below keeps
@@ -625,6 +640,25 @@ NaowhForever_Market/
   Watch Alerts is on. A listing search on the panel tells you too, once for each price it sees. The Watch List
   never searches Blizzard's window for you: it names the item and its price, and you buy it there. A chat line cannot
   open anything, since the addon has no clickable chat links.
+- Cheap Upgrades (`cheapUpgrades`, off by default) reads your scans (`ns.AuctionPriceList`), not the auction
+  house: it sends no searches, so the query throttle never comes into it, and it works before a scan from the price
+  feed. Each piece is weighed by Stat Weights' `SW.BestGain`, the same gain as the upgrade line on tooltips, against
+  what you wear, and only for your class and your level. Without the BiS List loaded there are no weights, so the
+  view says to turn it on.
+- Cheap Upgrades lists the biggest upgrade first, not the most per gold: your price already caps what it costs, and
+  per gold a one-copper trinket of a tenth of a percent would top the list.
+- Its price, `upgradesMax`, is in copper (default 10 gold), set in the view's own box. The list is worked out again
+  only when it goes stale: the view shown, the price changed, gear changed (`PLAYER_EQUIPMENT_CHANGED`, registered
+  only while the view is shown), a scan's refresh, or item data arriving. Typing filters the last result.
+- Pieces arriving from the server are gathered for `LOADED_DELAY` before one redraw: each redraw weighs every
+  piece in your scans, and a cold list brings hundreds of item loads in a few seconds.
+- A row's price is the scan's (`Upgrades.Price`), the one the list was filtered by, not `ns.AuctionPrice`, which
+  can answer from another addon's prices.
+- A random-enchantment piece ("of the Bear") is listed, priced and weighed as its base item: the price list is one
+  price per item ID, and scans keep a variant's price by its name with no link to weigh, so such pieces rarely show.
+- In the panel a click runs a name search in Blizzard's Buy tab through `Searches.Run`, the Searches view's path,
+  not an exact one: a random-enchantment piece's listing name carries its suffix. In the full window it shows the
+  item's listings with Buy, as a watched item does.
 - The panel's line counts the watched items at or under your price at the last scan, and opens the Buy tab on the
   Watch List. It hides on Buy, where the list and the tab's green count already show them.
 - The panel follows Blizzard's tabs through a post-hook on `AuctionHouseFrame:SetDisplayMode`, reading
@@ -761,6 +795,9 @@ NaowhForever_Market/
 - With more than one to buy, the row's Buy asks how many first (`ns.PromptText`, filled in with them all),
   so part of a row can be bought: a number over the row's count buys the row's count, and one that costs
   more than you carry says so and asks the game nothing. The quote is then for the number typed.
+- While it asks, the line under the box gives the total for the number typed and the price each, from the
+  listings shown (`CostOf`), and the rows that number buys from are lit with the picked fill. Closing the
+  prompt puts them back. The game's quote, not this total, is what the confirm then names.
 - Cancel is My Auctions' confirm and `Auctions.Cancel`: one auction a click, never twice. The auction is the
   search result's own `auctionID` on a row that holds yours, which is what Blizzard's Auctions tab cancels
   from the same rows, offered only while `CanCancelAuction` says so.
@@ -813,9 +850,11 @@ NaowhForever_Market/
 - Thin markets are left out. An item needs `MOVERS_MIN_LISTED` (5) listed on both days where the count is
   known (an unknown count still counts, or history from before the counts would list nothing), and a price
   of at least `MOVERS_MIN_PRICE` (a silver) on both, so 1c to 2c is not +100%. Each list is its
-  `MOVERS_TOP` (20) biggest moves, biggest first.
+  `MOVERS_TOP` (20) biggest moves of Uncommon or better items, biggest first. An item whose quality is not
+  loaded yet is kept until it loads.
 - They are worked out when the list is drawn and the history has changed since (`house.at`): after a scan,
-  a sighting, or on opening the view, never per frame. Only the listed items' prices and changes are kept.
+  a sighting, or on opening the view, never per frame. They are worked out again when a kept item loads as
+  Poor or Common. Only the listed items' prices and changes are kept.
 - While Dropped or Rose shows, the writ filter is put away and the search takes its room; typing still
   searches every scan by name. The view you left is the one you come back to until a reload, as on Buy.
 - The switch's labels are `Dropped (price)` and `Rose (price)` in the catalog: Dropped already means loot
@@ -852,6 +891,18 @@ NaowhForever_Market/
 - The buttons' OnUpdate builds the tooltip again every frame while it is up. The total is therefore kept
   for `TOTAL_KEEP` (half a second) for the mail under the mouse: its `ATTACHMENTS_MAX_RECEIVE` (16)
   attachments are read twice a second, not sixty times, and a mail that changed is right half a second on.
+- Collect Mail (`mailCollect`, off, on My Auctions) puts a Collect button beside the inbox, where the Alts
+  button sits beside Send. Its menu takes All Mail, Sold Auctions, Bought Auctions, or Expired and Cancelled,
+  each with how many mails it would open. All Mail is what Blizzard's Open All takes; the others match a
+  mail as the Ledger does (`Ledger.MailKind`): the invoice type first, then the auction mail subjects.
+- It takes one thing at a time, gold first, then each attachment, every `TAKE_DELAY` (0.15 s) and only while
+  `C_Mail.IsCommandPending` is false, the pace Open All keeps. Each take scans the inbox from the top, as a
+  mail emptied of its last attachment is deleted and the ones under it move up. Taking goes through the
+  global `TakeInboxMoney` and `TakeInboxItem`, so the Ledger's hooks record each sale and failed auction.
+- C.O.D. and GM mail are never taken, as Open All leaves them to the player. With full bags it still takes
+  gold, so Sold works with no free slot, and says once that items stayed in the mail. An item that fails
+  (`MAIL_FAILED` with its ID, such as a unique one you hold) is skipped; a failure with no item stops.
+- Its OnUpdate runs only while collecting. Clicking Stop, the Send tab or closing the mailbox ends it, as Open All stops when its button hides.
 - Average Price (`tooltipAverage`, off) adds "7-day average": the mean of the item's lowest price on each
   day that has one among the last `CHANGE_DAYS` (7) days of history, the window the change line looks back
   over, counted back from the last day with prices. It needs `AVERAGE_MIN_DAYS` (3) of them: two days are
@@ -880,7 +931,7 @@ and their share string, and `test-market-search-view.lua` Buy's Watch List and S
 `test-market-houses.lua` covers the other auction house's price and what is kept per house,
 `test-market-movers.lua` the movers, and `test-market-buy-watch.lua` Price Graph's list, its views and its header.
 `test-market-bank.lua` covers Include Bank: what is kept of the bank, its worth and its lines on the card,
-and `test-market-mail.lua` Mailbox Total.
+`test-market-mail.lua` Mailbox Total and `test-market-collect.lua` Collect Mail.
 `test-market-sell-ask.lua` builds the Sell page on stub frames (`market_sell_page.lua`) for Ask Before a Bad Post,
 `test-market-sell-marks.lua` for favourites and hidden items, `test-market-sell-undercut.lua` for Undercut's Percent
 and Fixed Amount and the Starting Bid, `test-market-sell-past.lua` for your past posts, and
@@ -953,7 +1004,8 @@ Away from the auction house:
 32. Picking a zone draws its map with every herb and vein: bigger pins for more gold, a gold line for
     the loop, faded pins for nodes you gathered in the last ten minutes.
 33. Herbs, Veins and Nodes I Can't Gather Yet change the map, the loop and the list.
-34. Start Loop places a waypoint at the nearest stop and the next as you reach each.
+34. Start Loop places a waypoint at the nearest stop and the next as you reach each: within 15 yards
+    of it, or when you gather a node near it. The Waypoint Pin's navigator skips to the next stop.
 35. Clicking a pin shows its item in the strip: price, the last 14 days, what you hold. With Farm docked
     at an auctioneer, Sell picks it on the panel's Sell page.
 36. Gather a few herbs or veins: Farm's picked item shows what you hold of it.
@@ -1322,8 +1374,24 @@ The Ledger:
      match the lists, and "Last day" is today's change. Pick another character and All Characters: the line
      and the cards add up the picked ones.
 162. Sort each column both ways and filter by name: the list and its foot line follow. Scroll a long list: smooth.
+     Pick Auction in Sales' Type: only auction sales, the foot line their total; the Type list offers only types the
+     tab has. Switch to Other and back: Other is on All Types, Sales still on Auction, after a reload too.
 163. Turn Record Gold off: the Ledger keeps what it has, says it is off, and nothing more is recorded.
 164. With Auctionator loaded, run its scan and turn on Auctionator Prices: an item Auctionator has priced shows
      Auctionator's price on its tooltip as "each, Auctionator", and The Market's Sell, Bag Worth and Professions'
      costs use it. An item Auctionator has not priced shows our price and age. Disable Auctionator and reload:
      the row is unavailable and prices are our own again.
+165. On a commodity with several listings, hover the third row and click Buy: under the box it reads the total and
+     the price each for 1, with the cheapest row lit. Type 0, a word, a number inside the second row and one past
+     the third: no line and no rows lit, then the first two lit, then all three, totalled only up to the third.
+     Type more than you can pay: it says so. Cancel: the rows go back. Buy: the confirm's total matches the line.
+
+Collect Mail, at a mailbox:
+
+166. With Collect Mail off (the default), the inbox is Blizzard's own. On, a Collect button sits beside the
+     inbox. Its menu lists All Mail, Sold Auctions, Bought Auctions and Expired and Cancelled, each with a count.
+167. With sold, expired, cancelled and won auction mail and a mail from another character, pick Sold Auctions:
+     only the sold mails' gold comes out, the button reads Stop meanwhile, and the Ledger's Sales lists each once.
+     Bought Auctions and Expired and Cancelled take only theirs; All Mail takes the rest.
+168. A C.O.D. mail stays. With full bags, Sold still takes gold, and Expired says items stayed in the mail.
+169. Click Stop, the Send tab, or close the mailbox, part way: it stops. No Lua error and no blocked action, in or out of combat.

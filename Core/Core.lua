@@ -141,7 +141,7 @@ function ns.Lower(text)
     return (text:lower():gsub(LATIN_CAPITAL, LatinLower))
 end
 
-ns.CODE_BUILD = "1.4.5"
+ns.CODE_BUILD = "1.4.10"
 
 ns.THEME = {
     bg     = { r = 0x19 / 255, g = 0x1b / 255, b = 0x1d / 255 },
@@ -999,19 +999,28 @@ local function DialogButton(UI, panel, key, text, w, onClick, x)
     return button
 end
 
-function ns.PromptText(title, text, maxLetters, onAccept, acceptText, acceptFirst)
+function ns.PromptText(title, text, maxLetters, onAccept, acceptText, acceptFirst, onType)
     local UI = ns.UI
     local dimmer, panel = ns.MakeModal(PROMPT_W, PROMPT_H, "promptText")
     local head = UI.KeepFont(panel, "head", DIALOG_HEAD_SIZE, "OUTLINE")
     head:SetPoint("TOP", 0, -DIALOG_PAD)
     head:SetWidth(PROMPT_TEXT_W)
     head:SetText(ns.L(title))
-    panel:SetHeight(math.max(PROMPT_H, head:GetStringHeight() + PROMPT_ROOM))
+    panel:SetHeight(math.max(PROMPT_H, head:GetStringHeight() + PROMPT_ROOM) + (onType and DIALOG_PAD or 0))
     local box = UI.Keep(panel, "box", ns.NewEditBox)
     box:SetPoint("TOP", head, "BOTTOM", 0, -PROMPT_BOX_GAP)
     box:SetSize(PROMPT_BOX_W, PROMPT_BOX_H)
     box:SetMaxLetters(maxLetters or PROMPT_MAX_LETTERS)
+    box:SetScript("OnTextChanged", nil)
     box:SetText(text or "")
+    if onType then
+        local note = UI.KeepFont(panel, "note", COPY_HINT_SIZE, nil, ns.THEME.muted)
+        note:SetPoint("TOP", box, "BOTTOM", 0, -COPY_HINT_GAP)
+        note:SetWidth(PROMPT_TEXT_W)
+        local function Typed() note:SetText(onType(strtrim(box:GetText()))) end
+        box:SetScript("OnTextChanged", Typed)
+        Typed()
+    end
     local function Accept()
         local value = strtrim(box:GetText())
         if value == "" then return end
@@ -1027,6 +1036,7 @@ function ns.PromptText(title, text, maxLetters, onAccept, acceptText, acceptFirs
     dimmer:Show()
     box:SetFocus()
     box:HighlightText()
+    return dimmer
 end
 
 local function NewCopyScroll(p)

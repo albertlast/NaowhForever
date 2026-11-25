@@ -17,7 +17,7 @@ local CATEGORY_ORDER = A.CATEGORY_ORDER
 local WEAPON_SLOTS = { 16, 17 }
 local IMBUE = Enum.ItemEnchantType.Imbue
 local TEMPORARY = Enum.ItemEnchantType.Temporary
-local CLASS_INDEX = 6
+local FISHING_POLE = Enum.ItemWeaponSubclass.Fishingpole
 local REQUIRED_LEVEL = 5
 local ITEM_ICON = 10
 local ELITE = { elite = true, rareelite = true, worldboss = true }
@@ -445,7 +445,9 @@ local function RaidBuffs(list, playerBuffs)
 end
 
 local function PersonalPicked(family)
-    return S.Get("personalBuffPicks")[family.key] ~= false
+    local on = S.Get("personalBuffPicks")[family.key]
+    if on == nil then return not family.off end
+    return on
 end
 
 local function PersonalWarn()
@@ -627,28 +629,23 @@ local function SlotEnchanted(weaponSlot, warn, kind)
     return false
 end
 
+local function Armed(slot)
+    local id = GetInventoryItemID("player", slot)
+    if not id then return false end
+    local _, _, _, _, _, class, subclass = C_Item.GetItemInfoInstant(id)
+    return class == Enum.ItemClass.Weapon and subclass ~= FISHING_POLE
+end
+
 local function MissingSlot(slots, warn, kind)
     for _, slot in ipairs(slots) do
-        if GetInventoryItemID("player", slot) and not SlotEnchanted(slot == 16 and 0 or 1, warn, kind) then
+        if Armed(slot) and not SlotEnchanted(slot == 16 and 0 or 1, warn, kind) then
             return slot
         end
     end
 end
 
-local function WeaponSlots()
-    local slots = {}
-    for _, slot in ipairs(WEAPON_SLOTS) do
-        local id = GetInventoryItemID("player", slot)
-        if id and select(CLASS_INDEX, C_Item.GetItemInfoInstant(id)) == Enum.ItemClass.Weapon then
-            slots[#slots + 1] = slot
-        end
-    end
-    return slots
-end
-
 local function WeaponEnhancement(list)
-    local slots = WeaponSlots()
-    local slot = #slots > 0 and MissingSlot(slots, S.Get("consumablesMinutes") * SECONDS, TEMPORARY)
+    local slot = MissingSlot(WEAPON_SLOTS, S.Get("consumablesMinutes") * SECONDS, TEMPORARY)
     if not slot then return end
     local item = FirstCarried(D.WEAPON_ITEMS)
     if not item and Carried("weapon") then return end
@@ -678,7 +675,7 @@ end
 local function Has(family, buffs, warn)
     if family.weapons then return MissingSlot(family.weapons, warn, IMBUE) == nil end
     if family.target then return not EliteTarget() or TargetHas(family.spells) end
-    local aura = Find(buffs, family.spells, family.own)
+    local aura = Find(buffs, family.auras or family.spells, family.own)
         or family.custom and Named(buffs, C_Spell.GetSpellName(family.spells[1]))
     local duration = aura and not Secret(aura.duration) and aura.duration or nil
     return aura and Lasts(Left(aura), warn, duration), aura
@@ -737,6 +734,9 @@ local function PersonalBuffs(list, buffs)
     local warn = PersonalWarn()
     for _, family in ipairs(D.PERSONAL) do
         local spell = family.class == class and PersonalPicked(family) and Knows(family.spells)
+        if spell and family.tankTalent and not (C_SpellBook.IsSpellKnown(family.tankTalent) or IsTank("player")) then
+            spell = nil
+        end
         if spell and TankOnly(family) and GetNumGroupMembers() > 0 then
             OnTanks(list, family, buffs, warn, spell)
             spell = nil
@@ -751,6 +751,7 @@ local function PersonalBuffs(list, buffs)
                 if family.items then
                     entry.items, entry.item = family.items, FirstCarried(family.items)
                     entry.slot = MissingSlot(family.weapons, warn, IMBUE)
+                    if family.conjure and not entry.item then entry.spell, entry.unit = spell, "player" end
                 else
                     entry.spell, entry.unit = spell, family.target and "target" or "player"
                 end
@@ -836,6 +837,15 @@ function Reminders.WatchesTanks()
     return false
 end
 
+function Reminders.WatchesRole()
+    if not S.Get("personalBuffs") then return false end
+    local _, class = UnitClass("player")
+    for _, family in ipairs(D.PERSONAL) do
+        if family.tankTalent and family.class == class and PersonalPicked(family) then return true end
+    end
+    return false
+end
+
 function Reminders.WatchesImbue()
     if not S.Get("personalBuffs") then return false end
     local _, class = UnitClass("player")
@@ -870,7 +880,7 @@ function Reminders.CastCovers(key, spellID, onSelf)
 end
 
 function Reminders.WeaponCovered(key)
-    if key == "weapon" then return MissingSlot(WeaponSlots(), S.Get("consumablesMinutes") * SECONDS, TEMPORARY) == nil end
+    if key == "weapon" then return MissingSlot(WEAPON_SLOTS, S.Get("consumablesMinutes") * SECONDS, TEMPORARY) == nil end
     return type(key) == "table" and key.weapons ~= nil and MissingSlot(key.weapons, PersonalWarn(), IMBUE) == nil
 end
 

@@ -277,45 +277,67 @@ local function RestorePlaceholders()
     end
 end
 
-local function SkinFrame(frame)
-    SkinBox(frame)
-    if frame.title then SkinTitle(frame.title) end
-    SkinPlaceholders(frame)
+-- RestedXP's windows as a table of its frame, its title and what restyles them. Since 4.11.39 they are widgets
+-- (targeting.activeTargetWindow, activeItemWindow) that restyle with UpdateTheme and keep the title; before, they were
+-- frames (activeTargetFrame, activeItemFrame) that restyled with UpdateVisuals and had the title on them.
+local function SkinPart(widget, frame)
+    if Has(widget, "UpdateTheme") and type(widget.frame) == "table" then
+        return { frame = widget.frame, title = widget.title, owner = widget, restyle = "UpdateTheme" }
+    elseif Has(frame, "UpdateVisuals") then
+        return { frame = frame, title = frame.title, owner = frame, restyle = "UpdateVisuals" }
+    end
+end
+
+local function SkinFrame(part)
+    SkinBox(part.frame)
+    if part.title then SkinTitle(part.title) end
+    SkinPlaceholders(part.frame)
 end
 
 local function SkinFrames()
     local rxp = _G.RXP
     local frames = {}
-    local target, items = Dig(rxp, "targeting", "activeTargetFrame"), Dig(rxp, "activeItemFrame")
+    local target = SkinPart(Dig(rxp, "targeting", "activeTargetWindow"), Dig(rxp, "targeting", "activeTargetFrame"))
+    local items = SkinPart(Dig(rxp, "activeItemWindow"), Dig(rxp, "activeItemFrame"))
     if target then table.insert(frames, target) end
     if items then table.insert(frames, items) end
     return frames
 end
 
+local function TargetFrame()
+    return Dig(_G.RXP, "targeting", "activeTargetWindow", "frame") or Dig(_G.RXP, "targeting", "activeTargetFrame")
+end
+
 local function SkinHooks(frames)
-    for _, frame in ipairs(frames) do
-        if not watched[frame] then
-            watched[frame] = true
-            hooksecurefunc(frame, "UpdateVisuals", function(self)
-                if active then SkinFrame(self) end
+    for _, part in ipairs(frames) do
+        if not watched[part.frame] then
+            watched[part.frame] = true
+            hooksecurefunc(part.owner, part.restyle, function()
+                if active then SkinFrame(part) end
             end)
         end
     end
     local targeting = Dig(_G.RXP, "targeting")
     if not targeting or targetingHooked then return end
     targetingHooked = true
-    hooksecurefunc(targeting, "RenderTargetFrameBackground", function()
-        if active and targeting.activeTargetFrame then SkinBox(targeting.activeTargetFrame) end
-    end)
-    hooksecurefunc(targeting, "UpdateTargetFrame", function()
-        if active and targeting.activeTargetFrame then SkinPlaceholders(targeting.activeTargetFrame) end
-    end)
+    if Has(targeting, "RenderTargetFrameBackground") then
+        hooksecurefunc(targeting, "RenderTargetFrameBackground", function()
+            local frame = TargetFrame()
+            if active and frame then SkinBox(frame) end
+        end)
+    end
+    if Has(targeting, "UpdateTargetFrame") then
+        hooksecurefunc(targeting, "UpdateTargetFrame", function()
+            local frame = TargetFrame()
+            if active and frame then SkinPlaceholders(frame) end
+        end)
+    end
 end
 
-local function SkinRestore(frame)
-    Run("WindowSkin", frame.UpdateVisuals, frame)
-    for _, part in ipairs({ frame, frame.title }) do
-        local border, back = part.rxpBorder, part.rxpBackground
+local function SkinRestore(part)
+    Run("WindowSkin", part.owner[part.restyle], part.owner)
+    for _, box in ipairs({ part.frame, part.title }) do
+        local border, back = box.rxpBorder, box.rxpBackground
         if border then border:SetShown(not back or back:IsShown()) end
     end
 end

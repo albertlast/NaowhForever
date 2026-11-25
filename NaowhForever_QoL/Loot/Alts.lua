@@ -18,7 +18,7 @@ local TEXT_FORGET_TITLE = ns.L("Forget a character")
 local TEXT_NONE = ns.L("No characters recorded yet.")
 local TEXT_FORGET = ns.L("Forget %s on %s? It comes back the next time you log in on it with a Mail & Alts option on.")
 local APPLY_KEYS = { enabled = true, altCounts = true, mailAlts = true, mailExpiry = true, lootFeed = true,
-    lootFeedBank = true }
+    lootFeedBank = true, watchList = true }
 
 local realmKey, me, bankOpen, mailPending
 local here = ItemLocation:CreateEmpty()
@@ -32,7 +32,7 @@ local function RosterOn()
 end
 
 local function BankOn()
-    return S.Get("enabled") and (S.Get("altCounts") or S.Get("lootFeed") and S.Get("lootFeedBank"))
+    return S.Get("enabled") and (S.Get("altCounts") or S.Get("lootFeed") and S.Get("lootFeedBank") or S.Get("watchList"))
 end
 
 function ns.AltRealm()
@@ -58,6 +58,7 @@ local function Me()
     end
     realm[name] = realm[name] or {}
     realm[name].full = true
+    realm[name].other = nil
     return realm[name]
 end
 
@@ -221,7 +222,7 @@ function ns.AltList()
     for name, c in pairs(ns.AltRealm()) do
         if name ~= mine then
             list[#list + 1] = { name = name, class = c.class, level = c.level or 0, money = c.money or 0,
-                full = c.full == true }
+                full = c.full == true, other = c.other == true }
         end
     end
     table.sort(list, ByLevelThenName)

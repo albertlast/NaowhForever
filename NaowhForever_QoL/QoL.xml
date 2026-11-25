@@ -22,6 +22,7 @@
     <Script file="Questing\GroupButtons.lua"/>
     <Script file="Questing\FreeForAll.lua"/>
     <Script file="Questing\LayerSwap.lua"/>
+    <Script file="Questing\WhisperInvite.lua"/>
     <Script file="Questing\QuestProgress.lua"/>
     <Script file="Questing\QuestLinks.lua"/>
     <Script file="Questing\QuestItems.lua"/>
@@ -52,6 +53,8 @@
     <Script file="Interface\Scout.lua"/>
     <Script file="Combat\SpellQueue.lua"/>
     <Script file="Loot\LootFeed.lua"/>
+    <Script file="Loot\LootFeedSettings.lua"/>
+    <Script file="Loot\LootRolls.lua"/>
     <Script file="Loot\WaylaidCratesData.lua"/>
     <Script file="Loot\WritRequestsData.lua"/>
     <Script file="Loot\VendorSoldData.lua"/>
@@ -62,6 +65,7 @@
     <Script file="XP\XPBarFX.lua"/>
     <Script file="XP\XPBar.lua"/>
     <Script file="XP\GroupXP.lua"/>
+    <Script file="XP\WatchList.lua"/>
     <Script file="Questing\PlayerHistory.lua"/>
     <Script file="Loot\Restock.lua"/>
     <Script file="Loot\GearReminders.lua"/>

@@ -20,8 +20,6 @@ local BAR_MARGIN, BAR_MIN_W = 8, 200
 local UNDER_BUTTON = 4
 local CLOSE_SIZE, CLOSE_IN = 22, 9
 local BUTTON_SIZE, BUTTON_GAP, BUTTON_RIGHT, BUTTON_TOP = 32, 2, 4, 2
-local BUTTON_ALPHA = 0.9
-local ICON_INSET = 4
 local SCROLL_W, SCROLL_IN = 4, 2
 local TRACK_W, BOX_W, BOX_H, BOX_ALPHA, SLIDER_GAP = 70, 30, 14, 1, 6
 
@@ -33,7 +31,7 @@ local TEXT_SIZE, TEXT_SIZE_TIP = ns.L("Town Pin Size"), ns.L("How big the town p
 
 local ROWS = ns.TownPinRows
 
-local button, buttonBorder, panel, content
+local button, panel, content
 local rows, strips = {}, {}
 
 local function TownOn()
@@ -273,31 +271,14 @@ local function OnButtonClick()
     panel:SetShown(not panel:IsShown())
 end
 
-local function OnButtonEnter()
-    buttonBorder:SetColor(T.accent.r, T.accent.g, T.accent.b, 1)
-end
-
-local function OnButtonLeave()
-    buttonBorder:SetColor(St.BORDER_RGB.r, St.BORDER_RGB.g, St.BORDER_RGB.b, 1)
-end
-
 local function OnMapShow()
     PlaceButton()
     PlacePanel()
 end
 
 local function BuildButton()
-    button = CreateFrame("Button", nil, WorldMapFrame:GetCanvasContainer())
+    button = ns.Shared.Parts.LogoButton(WorldMapFrame:GetCanvasContainer(), OnButtonClick)
     button:SetFrameStrata("DIALOG")
-    ns.Solid(button, "BACKGROUND", T.bg, BUTTON_ALPHA):SetAllPoints()
-    buttonBorder = ns.Border(button, St.BORDER_RGB)
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetTexture(St.LOGO_SMALL)
-    icon:SetPoint("TOPLEFT", ICON_INSET, -ICON_INSET)
-    icon:SetPoint("BOTTOMRIGHT", -ICON_INSET, ICON_INSET)
-    button:SetScript("OnClick", OnButtonClick)
-    button:SetScript("OnEnter", OnButtonEnter)
-    button:SetScript("OnLeave", OnButtonLeave)
     ns.Tooltip(button, TEXT_TITLE, TEXT_TIP)
     PlaceButton()
     WorldMapFrame:HookScript("OnShow", OnMapShow)

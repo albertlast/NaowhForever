@@ -14,7 +14,7 @@ local LIST_BAR, LIST_BAR_GAP = St.LIST_BAR, St.LIST_BAR_GAP
 local LEFT_W = 440
 local PANE_GAP, ROW_GAP, HEAD_GAP = 16, 8, 10
 local MAP_TOP = TAB_H + ROW_GAP + TAB_H + ROW_GAP
-local NAMED_FLOORS, NUMBER_W, FLOOR_NAME_GAP = 3, 34, 10
+local NAMED_FLOORS, NUMBER_W, FLOOR_NAME_GAP = 3, 48, 10
 local SIDE_TOP = TAB_H + ROW_GAP
 local MAP, QUESTS, KEYS = "map", "quests", "keys"
 local TAB_MAP = { key = MAP, label = "Map and Boss" }
@@ -135,7 +135,7 @@ local function MapDrawn()
         floorItems[i] = item
     end
     floorTabs:SetShown(#floors > 1)
-    floorTabs:SetWidth(named and leftW or #floors * NUMBER_W)
+    floorTabs:SetWidth(named and leftW or math.min(leftW, #floors * NUMBER_W))
     Parts.SetTabs(floorTabs, floorItems)
     Parts.PaintTabs(floorTabs, mapView.floor)
     floorName:SetShown(#floors > 1 and not named)

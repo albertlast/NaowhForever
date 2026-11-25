@@ -79,7 +79,7 @@ Check(Q.Mine(92460) and Q.Mine(92596) and not Q.Mine(92595), "a High Order Skybo
 -- The Dungeon Quest Tracker: Serpentbloom (962) is Horde-only, Important Heirlooms (96403)
 -- Alliance-only, and The Orb of Soran'ruk (1740) is for warlocks of either faction.
 local function Tracker(who)
-    local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Journal = {} }
+    local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Journal = {}, OnApply = function() end }
     local env = Env(ns, who)
     for _, path in ipairs({ "NaowhForever_DungeonJournal/Constants.lua", "NaowhForever_DungeonJournal/Data/Quests.lua",
         "NaowhForever_DungeonJournal/Data/QuestChains.lua", "NaowhForever_DungeonJournal/Quests.lua" }) do

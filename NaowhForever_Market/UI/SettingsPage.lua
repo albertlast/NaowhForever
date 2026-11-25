@@ -5,8 +5,9 @@ local Market = ns.Market
 local S = Market.Settings
 local Settings = ns.Shared.Settings
 
-local ORDER_AUCTIONEER, ORDER_SELLING, ORDER_AUCTIONS, ORDER_BAGS, ORDER_PRICES, ORDER_WATCH, ORDER_LEDGER, ORDER_KEYS =
-    5, 10, 15, 20, 30, 40, 50, 80
+local ORDER_AUCTIONEER, ORDER_SELLING, ORDER_AUCTIONS, ORDER_BAGS, ORDER_PRICES, ORDER_WATCH, ORDER_UPGRADES =
+    5, 10, 15, 20, 30, 40, 45
+local ORDER_LEDGER, ORDER_KEYS = 50, 80
 local TEXT_OFF = ns.L("Turn on The Market")
 local TEXT_PROFESSIONS_OFF = "Turn on Professions"
 local TEXT_NEEDS_TOOLTIP = ns.L("Needs Tooltip Lines")
@@ -188,6 +189,9 @@ page:Card({
         { key = "aheadAllowed", label = "Items Ahead Allowed", slider = AHEAD_RANGE, needs = On, why = Why,
           help = "An auction is undercut only when more than this many items are listed for less. Other sellers' "
               .. "stackable goods at your price count too, as the newest sells first." },
+        { key = "mailCollect", label = "Collect Mail", toggle = true, needs = On, why = Why,
+          search = "mailbox inbox open all take sold expired bought cancelled",
+          help = "A Collect button beside your inbox takes all your mail, or only sold, bought or expired auctions." },
     },
 })
 
@@ -241,6 +245,16 @@ page:Card({
     rows = {
         { key = "watchAlerts", label = "Watch Alerts", toggle = true, needs = On, why = Why,
           help = "A chat line after each scan for every watched item at or under your price." },
+    },
+})
+
+page:Card({
+    id = "upgrades", name = "Cheap Upgrades", order = ORDER_UPGRADES,
+    help = "Gear on the auction house that beats what you wear, on the Buy tab beside it.",
+    search = "upgrade gear cheap boe stat weights better armor weapon",
+    rows = {
+        { key = "cheapUpgrades", label = "Cheap Upgrades", toggle = true, needs = On, why = Why,
+          help = "An Upgrades list on Buy of the gear in your scans that beats yours, under your price." },
     },
 })
 

@@ -623,6 +623,18 @@ local function OnRxpUpdate()
     PaintArrow()
 end
 
+-- what RestedXP calls to dress the arrow: UpdateTheme since 4.11.39, UpdateVisuals before
+local ARROW_RESTYLE = { "UpdateTheme", "UpdateVisuals" }
+
+local function HookRestyle(arrow)
+    for _, name in ipairs(ARROW_RESTYLE) do
+        if Has(arrow, name) then
+            hooksecurefunc(arrow, name, OnRxpUpdate)
+            return
+        end
+    end
+end
+
 local function OnArrowSize()
     if fitted then Fit(hookedArrow, hookedArrow.texture, fitted) end
 end
@@ -632,7 +644,7 @@ function StartArrow()
     if not arrow then return end
     if not hookedArrow then
         hookedArrow = arrow
-        hooksecurefunc(arrow, "UpdateVisuals", OnRxpUpdate)
+        HookRestyle(arrow)
         OnRxpUpdate()
     end
     if styleHooked or not ns.RXPArrowEnabled() then return end

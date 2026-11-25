@@ -150,6 +150,7 @@ local function World(account, opts)
     end
     env.hooksecurefunc = function(tbl, name, fn)
         local original = tbl[name]
+        if type(original) ~= "function" then error("Attempt to hook a non-existent function: " .. tostring(name)) end
         tbl[name] = function(...)
             local results = { original(...) }
             fn(...)
@@ -1737,6 +1738,14 @@ do
         return button
     end
 
+    local function Paint(part)
+        part.rxpBackground.textures[1]:SetVertexColor(0.1, 0.2, 0.3, 0.9)
+        for _, edge in ipairs(part.rxpBorder.textures) do
+            edge:SetTexture(RXP_EDGE)
+            edge:SetVertexColor(0.7, 0.6, 0.5, 1)
+        end
+    end
+
     local function Satellite(w, title)
         local f = Box(w)
         f.paints = 0
@@ -1749,13 +1758,6 @@ do
         function text:GetFont() return self.font, self.fontSize, self.fontFlags end
         function text:GetStringWidth() return self.font == RXP_FONT and 60 or 80 end
         f.title.text = text
-        local function Paint(part)
-            part.rxpBackground.textures[1]:SetVertexColor(0.1, 0.2, 0.3, 0.9)
-            for _, edge in ipairs(part.rxpBorder.textures) do
-                edge:SetTexture(RXP_EDGE)
-                edge:SetVertexColor(0.7, 0.6, 0.5, 1)
-            end
-        end
         function f:UpdateVisuals()
             self.paints = self.paints + 1
             Paint(self)
@@ -1953,6 +1955,8 @@ do
         "the window turned off: RestedXP's own look is back")
     target:UpdateVisuals()
     Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9), "and stays")
+    w.rxp.targeting:RenderTargetFrameBackground()
+    Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9), "and so does the background of the targets, as RestedXP renders it")
 
     -- the placeholders of the target buttons are the new icons, with the window on and a style picked
     local buttons = target.buttons
@@ -1975,6 +1979,121 @@ do
     Flush(w)
     Check(buttons[1].placeholder.id == 2056011 and buttons[2].placeholder.id == 135274,
         "the window off: RestedXP's placeholders are back")
+
+    -- RestedXP 4.11.39: the same two windows are widgets. UpdateTheme restyles the frame, the title is the widget's and not
+    -- the frame's, the frame has no UpdateVisuals and the targets no RenderTargetFrameBackground. Hooking what is not
+    -- there is an error in the game.
+    local function Mini(world, title)
+        local frame = Satellite(world, title)
+        local widget = { frame = frame, title = frame.title, paints = 0 }
+        frame.title, frame.UpdateVisuals = nil, false
+        function widget:UpdateTheme()
+            self.paints = self.paints + 1
+            Paint(self.frame)
+            Paint(self.title)
+            self.title.text:SetFont(RXP_FONT, 9, "")
+            self.title.text:SetTextColor(0.9, 0.9, 0.9)
+            self.title:SetSize(70, 19)
+        end
+        widget:UpdateTheme()
+        return widget
+    end
+
+    local function Minis(world, rxp)
+        rxp.targeting = { activeTargetWindow = Mini(world, "Active Targets") }
+        function rxp.targeting:UpdateTargetFrame() self.updates = (self.updates or 0) + 1 end
+        rxp.activeItemWindow = Mini(world, "Active Items")
+    end
+
+    local quiet = Begin({}, Minis)
+    local quietTargets = quiet.rxp.targeting.activeTargetWindow
+    Check(Is(Fill(quietTargets.frame), 0.1, 0.2, 0.3, 0.9) and quietTargets.title.text.font == RXP_FONT
+        and quietTargets.paints == 1, "4.11.39, the window off: the windows are left as RestedXP paints them")
+
+    local mini = Begin({ rxpWindow = true, rxpWindowTheme = "custom" }, Minis)
+    local miniNs = mini.ns
+    local mr, mg, mb = miniNs.RXPWindowColor("box")
+    local widgets = { targets = mini.rxp.targeting.activeTargetWindow, items = mini.rxp.activeItemWindow }
+    for name, widget in pairs(widgets) do
+        Check(Is(Fill(widget.frame), mr, mg, mb, 0.55) and Is(Fill(widget.title), mr, mg, mb, 0.55),
+            "4.11.39 " .. name .. ": the background and the title's take the look of the window")
+        Check(widget.frame.rxpBorder.shown == true and widget.title.rxpBorder.shown == true
+            and widget.title.text.font == "Fonts\\Naowh.ttf" and widget.title.text.fontSize == 9
+            and widget.title.width == 90 and widget.title.height == 19,
+            "4.11.39 " .. name .. ": the border, and the title in the window's face at RestedXP's size")
+        widget:UpdateTheme()
+        Check(Is(Fill(widget.frame), mr, mg, mb, 0.55) and widget.title.text.font == "Fonts\\Naowh.ttf",
+            "4.11.39 " .. name .. ": RestedXP restyling it again does not undo that")
+    end
+    local miniFill = widgets.targets.frame.rxpBackground.textures[1]
+    miniFill.sets = 0
+    widgets.targets:UpdateTheme()
+    Check(miniFill.sets == 2, "4.11.39: hooked once, RestedXP paints it once and the window once")
+    for _ = 1, 3 do
+        miniNs.SetRXPWindowOption("rxpWindowSpacing", 6)
+        Flush(mini)
+    end
+    miniFill.sets = 0
+    widgets.targets:UpdateTheme()
+    Check(miniFill.sets == 2, "4.11.39: and however often the window is drawn")
+    miniNs.SetRXPWindowOption("rxpWindowBoxOpacity", 80)
+    Flush(mini)
+    Check(Is(Fill(widgets.items.frame), mr, mg, mb, 0.8) and Is(Fill(widgets.items.title), mr, mg, mb, 0.8),
+        "4.11.39: what is set for the window is what they follow")
+
+    local miniButtons = widgets.targets.frame.buttons
+    miniNs.RXPIconTexture = function(glyph) return "Ours\\" .. glyph end
+    mini.rxp.targeting:UpdateTargetFrame()
+    Check(miniButtons[1].placeholder.id == "Ours\\gossip" and miniButtons[2].placeholder.id == "Ours\\combat"
+        and miniButtons[3].placeholder.id == 135999, "4.11.39: the placeholders of the targets are ours after an update")
+    miniNs.SetRXPWindow(false)
+    Flush(mini)
+    Check(Is(Fill(widgets.targets.frame), 0.1, 0.2, 0.3, 0.9) and widgets.targets.title.text.font == RXP_FONT
+        and Is(Fill(widgets.items.title), 0.1, 0.2, 0.3, 0.9) and widgets.items.paints >= 2
+        and miniButtons[1].placeholder.id == 2056011, "4.11.39, the window turned off: RestedXP's own look is back")
+    mini.rxp.targeting:UpdateTargetFrame()
+    Check(miniButtons[1].placeholder.id == 2056011, "4.11.39: and an update of the targets leaves their placeholders")
+    widgets.items.frame.rxpBorder:Hide()
+    widgets.items.frame.rxpBackground:Hide()
+    widgets.items:UpdateTheme()
+    Check(Is(Fill(widgets.items.frame), 0.1, 0.2, 0.3, 0.9) and widgets.items.frame.rxpBorder.shown == false,
+        "4.11.39: and is left as it is painted")
+
+    local lateMini = Begin({ rxpWindow = true }, function(world, rxp)
+        rxp.targeting = { activeTargetWindow = Mini(world, "Active Targets") }
+    end)
+    local lateR, lateG, lateB = lateMini.ns.RXPWindowColor("box")
+    Check(Is(Fill(lateMini.rxp.targeting.activeTargetWindow.frame), lateR, lateG, lateB, 0.55),
+        "4.11.39: with one of the two not there yet")
+    lateMini.rxp.activeItemWindow = Mini(lateMini, "Active Items")
+    lateMini.rxp.SetStep()
+    Flush(lateMini)
+    Check(Is(Fill(lateMini.rxp.activeItemWindow.frame), lateR, lateG, lateB, 0.55),
+        "4.11.39: one RestedXP makes later has the look at the next draw")
+
+    -- a window as it was and the widget of the new one: the widget is the one that is followed
+    local both = Begin({ rxpWindow = true }, function(world, rxp)
+        rxp.targeting = { activeTargetWindow = Mini(world, "Active Targets"), activeTargetFrame = Satellite(world, "Old") }
+    end)
+    both.rxp.targeting.activeTargetFrame:UpdateVisuals()
+    local br, bg, bb = both.ns.RXPWindowColor("box")
+    Check(Is(Fill(both.rxp.targeting.activeTargetFrame), 0.1, 0.2, 0.3, 0.9)
+        and Is(Fill(both.rxp.targeting.activeTargetWindow.frame), br, bg, bb, 0.55),
+        "4.11.39: of the old frame and the new widget, only the widget is followed")
+
+    -- a window with nothing to restyle it by is left alone
+    local bare
+    local okBare, errBare = pcall(function()
+        bare = Begin({ rxpWindow = true }, function(world, rxp)
+            rxp.targeting = { activeTargetWindow = { UpdateTheme = function() end },
+                activeTargetFrame = Satellite(world, "Active Targets") }
+            rxp.targeting.activeTargetFrame.UpdateVisuals = false
+            rxp.activeItemWindow = { frame = Satellite(world, "Active Items"), title = Box(world) }
+        end)
+    end)
+    Check(okBare, "a window with neither UpdateTheme nor UpdateVisuals is no error" .. (okBare and "" or " (" .. tostring(errBare) .. ")"))
+    Check(okBare and Is(Fill(bare.rxp.targeting.activeTargetFrame), 0.1, 0.2, 0.3, 0.9)
+        and bare.rxp.targeting.activeTargetFrame.paints == 1, "and is left as RestedXP made it")
 end
 
 -- the icons of ours are drawn as a texture in the window's accent, as it is now

@@ -90,7 +90,13 @@ local METHODS = {
         frame.pointX = type(a) == "number" and a or type(b) == "number" and b or c
         frame.pointY = type(a) == "number" and b or c
     end,
-    IsVisible = function(frame) return rawget(frame, "shown") ~= false end,
+    IsVisible = function(frame)
+        repeat
+            if rawget(frame, "shown") == false then return false end
+            frame = rawget(frame, "parent")
+        until type(frame) ~= "table"
+        return true
+    end,
     Show = function(frame) frame.shown = true end,
     Hide = function(frame) frame.shown = false end,
     SetShown = function(frame, shown) frame.shown = shown and true or false end,
@@ -127,7 +133,10 @@ local METHODS = {
 Frame = function(state, parent)
     return setmetatable({ scripts = {}, events = {}, state = state, parent = parent }, { __index = function(_, key)
         if key == "HookScript" then
-            return function(_, script) state.hooks[#state.hooks + 1] = script end
+            return function(frame, script, fn)
+                state.hooks[#state.hooks + 1] = script
+                if frame == state.worldMap then state.hooked[script] = fn end
+            end
         end
         if METHODS[key] then return METHODS[key] end
         local measure = MEASURE_METHODS[key]
@@ -150,7 +159,7 @@ local function fixture(settings, noBis, language)
     local state = {
         level = 20, instance = nil, combat = false, bisList = true,
         hooks = {}, frames = 0, printed = {}, waypoints = {}, mapOpened = nil, requested = {},
-        refreshes = 0, made = {}, logged = {}, watched = {}, objectives = {}, account = {}, guid = "Player-4613-006EB819", now = 1000, clock = 50,
+        refreshes = 0, made = {}, hooked = {}, logged = {}, watched = {}, objectives = {}, account = {}, guid = "Player-4613-006EB819", now = 1000, clock = 50,
         bis = {}, worn = {}, owned = {}, names = {}, sources = {}, looks = {},
         log = {}, repQuests = {}, readyQuests = {},
         sent = {}, timers = {}, pushed = {}, fonts = {}, atlases = {}, dressable = {}, hasLook = {}, buttons = {},
@@ -378,6 +387,7 @@ local function fixture(settings, noBis, language)
         UIParent = Frame(state),
         GameTooltip = state.tooltip,
         GameTooltip_Hide = function() end,
+        GameTooltip_SuppressAutomaticCompareItem = function(tip) tip.suppressAutomaticCompareItem = true end,
         -- A home group, not an instance one (the dungeon finder's).
         IsInGroup = function(category) return state.party ~= nil and category ~= 2 end,
         IsInRaid = function() return false end,
@@ -718,6 +728,10 @@ do
         if entry.quest[1] == 6981 then glowing = entry end
     end
     check("The Glowing Shard is listed", glowing ~= nil)
+    local tome, QUEST = J.Quests.ByID(94984), J.C.QUEST
+    check("a quest with a giver per faction shows only the player's own", tome
+        and tome[QUEST.WHERE] == "Riverglades - Ashe Amberhall (66.7, 81)" and tome[QUEST.MAP] == 2548
+        and tome[QUEST.X] == 66.7 and tome[QUEST.Y] == 81.0)
     check("and has a waypoint: the dungeon's entrance", glowing.canWaypoint)
     check("hundreds of bosses", bosses > 150)
     check("the entrances with a source that matches Forever's map", entrances == 35)
@@ -1277,6 +1291,113 @@ do
 end
 
 -------------------------------------------------------------------------------
+--  Beside the map in a dungeon: the page drawn once, and again only when something changed
+-------------------------------------------------------------------------------
+do
+    local ns, state, S = fixture({ enabled = true, favourites = true })
+    local J, map = ns.Journal, state.worldMap
+    local draws, draw = 0, J.View.Mixin.Draw
+    J.View.Mixin.Draw = function(...)
+        draws = draws + 1
+        return draw(...)
+    end
+    ns.Apply()
+    state.instance = { id = 36, name = "The Deadmines" }
+    local wanted = J.Boss(639).loot[1]
+    J.Favourites.Toggle(wanted)
+    local function Open()
+        map.shown = true
+        state.hooked.OnShow(map)
+    end
+    local function Close()
+        map.shown = false
+        state.hooked.OnHide(map)
+    end
+    Open()
+    check("the map opened in a dungeon draws its page", draws == 1)
+    local view
+    for _, frame in ipairs(state.made) do
+        if rawget(frame, "keepHidden") then view = frame end
+    end
+    check("on a view that keeps it while the map is shut", view ~= nil)
+    local function Event(event, arg)
+        view.scripts.OnEvent(view, event, arg)
+    end
+    Close()
+    Open()
+    check("opened again with nothing changed, it is not drawn again", draws == 1)
+    Close()
+    Event("QUEST_LOG_UPDATE")
+    Event("BAG_UPDATE_DELAYED")
+    Open()
+    check("quest log and bag updates that change nothing on it leave it", draws == 1)
+    Close()
+    state.owned[wanted] = 1
+    Event("BAG_UPDATE_DELAYED")
+    Open()
+    check("a favourite looted while it was shut draws it again", draws == 2)
+    Close()
+    Event("PLAYER_EQUIPMENT_CHANGED")
+    check("gear changed while shut: it stops listening until it is drawn", next(view.events) == nil)
+    Open()
+    check("and draws on the next open", draws == 3)
+    Close()
+    S.Set("showChance", false)
+    Open()
+    check("a setting changed while shut draws it again", draws == 4)
+    Close()
+    J.Favourites.Toggle(wanted)
+    Open()
+    check("so does a favourite added or removed", draws == 5)
+    Close()
+    state.instance = nil
+    for _, frame in ipairs(state.made) do
+        if frame.events.PLAYER_ENTERING_WORLD and frame ~= view then
+            frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD")
+        end
+    end
+    check("after a loading screen it listens for nothing", next(view.events) == nil)
+    state.instance = { id = 36, name = "The Deadmines" }
+    Open()
+    check("and the next open draws it", draws == 6)
+    Close()
+    local function RunTimers()
+        local timers = state.timers
+        state.timers = {}
+        for _, fn in ipairs(timers) do fn() end
+    end
+    local function LoadingScreen()
+        for _, frame in ipairs(state.made) do
+            if frame.events.PLAYER_ENTERING_WORLD and frame ~= view then
+                frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD")
+            end
+        end
+        RunTimers()
+    end
+    LoadingScreen()
+    local warmed = draws
+    check("a loading screen into a dungeon draws its page with the map shut", warmed > 6 and view:IsVisible() == false)
+    Open()
+    check("so the first open after it draws nothing", draws == warmed)
+    Close()
+    view.waitingFor[4242] = true
+    Event("GET_ITEM_INFO_RECEIVED", 4242, true)
+    RunTimers()
+    check("an item's name arriving while shut draws it again, still shut", draws > warmed)
+    warmed = draws
+    Open()
+    check("and the open after that draws nothing", draws == warmed)
+    Close()
+    state.owned[J.Boss(639).loot[2]] = 1
+    Event("BAG_UPDATE_DELAYED")
+    Open()
+    check("any drop on the page looted while shut draws it again, for its In Bag tag", draws == warmed + 1)
+    Close()
+    S.Set("enabled", false)
+    check("off, the kept page listens for nothing", next(view.events) == nil)
+end
+
+-------------------------------------------------------------------------------
 --  Beside the map outside a dungeon: the factions earned where you are
 -------------------------------------------------------------------------------
 do
@@ -1437,6 +1558,7 @@ do
     check("not an upgrade, no look to collect", not DJ.Loot.Upgrade(notYet) and DJ.Loot.Appearance(notYet) == nil)
     check("found by a search for its name", notYetView:Listed(notYet, notYetName:lower()))
     row.scripts.OnEnter(row)
+    check("the game's item comparison waits for Shift", rawget(state.tooltip, "suppressAutomaticCompareItem") == true)
     check("its tooltip is the Journal's own", setByID == 0 and rawget(state.tooltip, "text") == notYetName)
     check("which says it is not in Forever yet", Has(tipLines, DJ.NOT_YET))
     check("and offers the menu, not a link it cannot give", Has(tipLines, "Right-click: menu"))
@@ -4674,12 +4796,13 @@ do
     providers[1]:RefreshAllData()
     local spots = {}
     for _, dungeon in ipairs(J.Dungeons()) do
-        local e = dungeon.entrance
-        if e and J.FactionShown(dungeon) then spots[e.map .. ":" .. e.x .. ":" .. e.y] = true end
+        if dungeon.entrance and J.FactionShown(dungeon) then
+            for _, e in ipairs(dungeon.doors or { dungeon.entrance }) do spots[e.map .. ":" .. e.x .. ":" .. e.y] = true end
+        end
     end
     local want = 0
     for _ in pairs(spots) do want = want + 1 end
-    check("a map that holds them shows every entrance, one pin per spot", #pins == want and want > 20)
+    check("a map that holds them shows every entrance and door, one pin per spot", #pins == want and want > 20)
     -- Off the map's edge: not on it.
     state.onMap = { [1415] = 3 }
     shownMap = 1415
@@ -4744,6 +4867,21 @@ do
     local waypoint = state.waypoints[#state.waypoints]
     check("a click puts a waypoint on the entrance", waypoint.map == 1445 and waypoint.x == 52.9
         and waypoint.note == " (entrance)" and waypoint.title == "Onyxia's Lair")
+    -- A dungeon with several doors: one pin each, named, its waypoint on that door.
+    shownMap = 1444   -- Feralas: Dire Maul
+    providers[1]:RefreshAllData()
+    local doors = {}
+    for _, group in ipairs(pins) do
+        if group.dungeons[1].key == "DireMaul" then doors[group.door] = group end
+    end
+    check("Dire Maul has a pin for each door, none for its courtyard", doors.East and doors["East Back Door"]
+        and doors.West and doors.North and #pins == 4)
+    pin:OnAcquired(doors.West)
+    pin:OnMouseEnter()
+    pin:OnClick("LeftButton")
+    waypoint = state.waypoints[#state.waypoints]
+    check("a door's waypoint is on that door, named for it", waypoint.map == 1444 and waypoint.x == 60.3
+        and waypoint.y == 30.7 and waypoint.title == "Dire Maul: West")
     S.Set("mapEntrances", false)
     check("off again, its pins go", #pins == 0)
 end

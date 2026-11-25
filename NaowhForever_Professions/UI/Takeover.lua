@@ -39,12 +39,18 @@ local REDRAW_KEYS = { vendorMaterials = true, bagReagents = true, bankReagents =
     learnedRecipeVendors = true,
     craftProfit = true, craftProfitList = true, buyMaterials = true, buyVendor = true, craftOrders = true,
     orderTip = true, ownedAuctions = true, makeReagents = true }
+local GUARD_DRIVER = "[combat] on; off"
+local GUARD_SNIPPET = [[
+    if newstate ~= "on" then return end
+    local frame = self:GetFrameRef("win")
+    if frame and frame:IsProtected() then frame:Hide() end
+]]
 local PROFESSIONS_ADDON = "Blizzard_Professions"
 local TSM_UI, TSM_TAG = "CRAFTING", "NaowhForever:Professions"
 
 local EMPTY = {}
 local waiting = R.waiting
-local win, hooked, lastMode, tsmHooked
+local win, hooked, lastMode, tsmHooked, guard
 local queued = false
 local savedTabPoints, tabsLeft
 local mirrored = {}
@@ -270,6 +276,14 @@ local function DockCards(content)
     end
 end
 
+local function Guard()
+    if guard then return end
+    guard = CreateFrame("Frame", nil, UIParent, "SecureHandlerStateTemplate")
+    guard:SetFrameRef("win", win)
+    guard:SetAttribute("_onstate-combat", GUARD_SNIPPET)
+    RegisterStateDriver(guard, "combat", GUARD_DRIVER)
+end
+
 local function DockBook(on)
     if on == bookDocked then
         bookPending = nil
@@ -283,6 +297,7 @@ local function DockBook(on)
     if not on then return Undock() end
     local content = ProfessionsFrame.BookPage and ProfessionsFrame.BookPage.ProfessionsContentFrame
     if not content then return end
+    Guard()
     DockCards(content)
 end
 
@@ -310,7 +325,7 @@ function Drag.Follow()
         Drag.pending = true
         return
     end
-    Drag.pending, Drag.following = nil, true
+    Drag.pending = nil
     local scale = win:GetEffectiveScale() / ProfessionsFrame:GetEffectiveScale()
     local x, y = pos.x * scale, pos.y * scale
     local eui = _G.EllesmereUIDB
@@ -319,8 +334,8 @@ function Drag.Follow()
         eui.shifterPositions.ProfessionsFrame = { point = "TOPLEFT", relPoint = "BOTTOMLEFT", x = x, y = y }
     end
     ProfessionsFrame:ClearAllPoints()
-    ProfessionsFrame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
-    Drag.following = false
+    -- Window movers (BlizzMove, MoveAny) put it back at their own spot from a SetPoint hook; the widget's own method runs no hooks.
+    getmetatable(ProfessionsFrame).__index.SetPoint(ProfessionsFrame, "TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
     Drag.Place()
 end
 
@@ -426,7 +441,6 @@ local function Activate(mode)
     lastMode = mode
     local opening = not win:IsShown() or linked ~= W.linked or orders ~= W.orders
     if opening then
-        W.selectedID, W.selectedUnlearned, W.offset = nil, nil, 0
         win:Show()
         Drag.Follow()
     end
@@ -444,6 +458,7 @@ local function Activate(mode)
         P.Book.Render()
         Redock()
     else
+        P.Window.SwapPlace(not linked and R.Profession().id, linked and opening)
         P.Window.Render()
     end
 end
@@ -459,6 +474,7 @@ end
 
 local function Update()
     if not (On() and ProfessionsFrame and ProfessionsFrame:IsShown()) or TsmShown() then return Deactivate() end
+    if BookOpen() and InCombatLockdown() then return Deactivate() end
     if BookOpen() and not Links.Viewing() and not C_TradeSkillUI.IsTradeSkillGuild() then
         return Activate("book")
     end
@@ -505,7 +521,7 @@ local function OnBlizzardHide()
 end
 
 local function OnBlizzardPlaced()
-    if not Drag.following then Drag.Follow() end
+    Drag.Follow()
 end
 
 local function OnBlizzardCreate()
@@ -554,6 +570,7 @@ local function OnEvent(_, event, name, loaded)
         events:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_REGEN_DISABLED" then
         if Drag.moving and win:IsProtected() then OnDragStop(win) end
+        if bookDocked then Deactivate() end
         return
     elseif event == "PLAYER_REGEN_ENABLED" then
         if bookPending ~= nil then DockBook(bookPending) end

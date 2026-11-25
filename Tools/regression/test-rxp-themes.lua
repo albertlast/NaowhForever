@@ -1085,6 +1085,62 @@ do
     Login(b4)
     Check(e4.RXPG_ARROW.texture.path == TEX .. "v2/rxp_navigation_arrow-1",
         "the window on with the arrow turned off: RestedXP's V2 arrow, not Dark Mode's black one")
+
+    -- RestedXP 4.11.39 calls the arrow's redraw UpdateTheme, not UpdateVisuals. Hooking what is not there is an error in
+    -- the game, and at login it stopped the window from starting.
+    local function Strict(e)
+        e.hooksecurefunc = function(tbl, name, fn)
+            if type(tbl) ~= "table" or type(tbl[name]) ~= "function" then
+                error("Attempt to hook a non-existent function: " .. tostring(name))
+            end
+            e.hooked[#e.hooked + 1] = { tbl, name, fn }
+        end
+    end
+    local function Restyles(e)
+        local names = {}
+        for _, h in ipairs(e.hooked) do
+            if h[1] == e.RXPG_ARROW and (h[2] == "UpdateTheme" or h[2] == "UpdateVisuals") then names[#names + 1] = h[2] end
+        end
+        return names
+    end
+    local function Renamed(saveData, shape)
+        local e, f, b = Start(saveData, "NaowhForever:rosenoir")
+        Strict(e)
+        shape(e.RXPG_ARROW)
+        local ok, err = pcall(Login, b)
+        return e, f, ok, err
+    end
+    local e5, f5, ok5, err5 = Renamed({ rxpThemes = true }, function(a)
+        a.UpdateVisuals = nil
+        function a.UpdateTheme() end
+    end)
+    Check(ok5, "4.11.39, UpdateTheme and no UpdateVisuals: login goes through" .. (ok5 and "" or " (" .. tostring(err5) .. ")"))
+    Check(#Restyles(e5) == 1 and Restyles(e5)[1] == "UpdateTheme", "its UpdateTheme is the one hooked")
+    local drawn5 = Layers(f5, e5.RXPG_ARROW)
+    Check(#drawn5 == 1 and drawn5[1].shown == true, "and the arrow is styled")
+    e5.RXP.activeTheme = e5.RXPGuides_Themes["NaowhForever:midnight"]
+    for _, h in ipairs(e5.hooked) do
+        if h[2] == "UpdateTheme" then h[3](e5.RXPG_ARROW) end
+    end
+    local midnightDeep = Gradient(e5.RXPGuides_Themes["NaowhForever:midnight"].mapPins)
+    Check(Close(drawn5[1].colorRegion.gradient[2], midnightDeep) and #Layers(f5, e5.RXPG_ARROW) == 1,
+        "RestedXP dressing the arrow again, under another theme of ours: it follows")
+
+    local e6, _, ok6 = Renamed({ rxpThemes = true }, function(a) function a.UpdateTheme() end end)
+    Check(ok6 and #Restyles(e6) == 1 and Restyles(e6)[1] == "UpdateTheme",
+        "with both names, the new one is hooked, and only that one")
+    local e7, _, ok7 = Renamed({ rxpThemes = true }, function() end)
+    Check(ok7 and #Restyles(e7) == 1 and Restyles(e7)[1] == "UpdateVisuals", "with only the old name, the old one is hooked")
+    local e8, f8, ok8 = Renamed({ rxpThemes = true }, function(a) a.UpdateVisuals = nil end)
+    Check(ok8 and #Restyles(e8) == 0 and #Layers(f8, e8.RXPG_ARROW) == 1,
+        "with neither, nothing is hooked, there is no error, and the arrow is styled as it is")
+    Check(#e8.hooked == 2, "and the arrow's rotation and text are still followed")
+    local e9, _, ok9 = Renamed({ rxpThemes = true, rxpArrowOn = false }, function(a)
+        a.UpdateVisuals = nil
+        function a.UpdateTheme() end
+    end)
+    Check(ok9 and #e9.hooked == 1 and e9.hooked[1][2] == "UpdateTheme",
+        "the arrow turned off: only its picture is watched, by the new name")
 end
 
 -- The title bar and footer.

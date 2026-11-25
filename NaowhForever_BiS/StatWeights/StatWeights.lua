@@ -39,6 +39,9 @@ local GAME_KEYS = {
     ITEM_MOD_BLOCK_RATING_SHORT = "block", ITEM_MOD_HASTE_RATING_SHORT = "haste", RESISTANCE0_NAME = "armor",
     ITEM_MOD_DAMAGE_PER_SECOND_SHORT = "dps", ITEM_MOD_EXPERTISE_RATING_SHORT = "exp",
     ITEM_MOD_ARMOR_PENETRATION_RATING_SHORT = "arp", ITEM_MOD_BLOCK_VALUE_SHORT = "bv",
+    ITEM_MOD_FIRE_DAMAGE_DONE_SHORT = "fire", ITEM_MOD_FROST_DAMAGE_DONE_SHORT = "frost",
+    ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT = "shadow", ITEM_MOD_NATURE_DAMAGE_DONE_SHORT = "nature",
+    ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT = "arcane", ITEM_MOD_HOLY_DAMAGE_DONE_SHORT = "holy",
 }
 local PER_PERCENT = {
     ITEM_MOD_HIT_RATING_SHORT = 10, ITEM_MOD_HIT_SPELL_RATING_SHORT = 10, ITEM_MOD_CRIT_RATING_SHORT = 14,
@@ -117,7 +120,7 @@ end
 local SW = { MAX_WORTH = 1000, PERCENT = 100 }
 ns.StatWeights = SW
 
-local S = UI.ModuleSettings("statWeights", { enabled = F.enabled, healerMana = F.healerMana,
+local S = UI.ModuleSettings("statWeights", { enabled = F.enabled, allSpecs = F.allSpecs, healerMana = F.healerMana,
     manaUpgrades = F.manaUpgrades, upgradeMarks = F.upgradeMarks, fightLength = FIGHT_LENGTH })
 SW.Settings = S
 ns.StatWeightSettings = S
@@ -185,12 +188,32 @@ function SW.TalentSpec()
     return talentSpec
 end
 
-function SW.ActiveSpec()
-    local picked = S.Get("spec")
-    local mine = SW.ClassSpecs()
-    for _, spec in ipairs(mine) do
+local function Picks()
+    local account = ns.AccountSettings()
+    if type(account.statWeightSpec) ~= "table" then account.statWeightSpec = {} end
+    return account.statWeightSpec
+end
+
+function SW.PickedSpec()
+    local picks = Picks()
+    local picked = picks[ns.CharKey(picks)]
+    -- Picks used to be one per profile.
+    if picked == nil then picked = S.Get("spec") end
+    for _, spec in ipairs(SW.ClassSpecs()) do
         if spec.key == picked then return picked end
     end
+end
+
+function SW.PickSpec(key)
+    local picks = Picks()
+    picks[ns.CharKey(picks)] = key or false
+    Changed(nil)
+end
+
+function SW.ActiveSpec()
+    local picked = SW.PickedSpec()
+    if picked then return picked end
+    local mine = SW.ClassSpecs()
     local talents = SW.TalentSpec()
     if talents then return talents end
     local B = ns.BiS

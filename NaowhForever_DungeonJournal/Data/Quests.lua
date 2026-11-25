@@ -189,7 +189,9 @@ J.QuestData = {
     } },
     { name = "Krol'dok Stronghold", map = 3039, levels = { 40, 47 }, quests = {
         { 94982, "Eye of Mugg", 40, "A", true, "Riverglades - Demar Brant (66.6, 81)", 2548, 66.6, 81.0 },
-        { 94984, "Tome of Twilight", 39, "B", true, "Riverglades - Ashe Amberhall for the Alliance (66.7, 81), Tran'gul for the Horde (59.4, 44.2)", alt = { 94972 } },
+        { 94984, "Tome of Twilight", 39, "B", true, "Riverglades - Ashe Amberhall for the Alliance (66.7, 81), Tran'gul for the Horde (59.4, 44.2)", alt = { 94972 },
+            sides = { A = { "Riverglades - Ashe Amberhall (66.7, 81)", 2548, 66.7, 81.0 },
+                      H = { "Riverglades - Tran'gul (59.4, 44.2)", 2548, 59.4, 44.2 } } },
         { 96771, "Vengeance of the Highborne", 37, "A", true, "Alterac Mountains - Ranath Nightstride (17.9, 66)", 1416, 17.9, 66.0 },
         { 94968, "Eye of Mugg", 40, "H", true, "TBD; hand it in to Krom'rosh" },
         { 94975, "A Token of Vengeance", 38, "H", true, "TBD" },

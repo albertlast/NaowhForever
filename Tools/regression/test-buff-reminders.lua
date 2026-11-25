@@ -207,7 +207,8 @@ local function Fixture(opts)
             return color
         end }),
         LOCALIZED_CLASS_NAMES_MALE = setmetatable({}, { __index = function(_, class) return class:lower() end }),
-        Enum = { ItemClass = { Weapon = 2 }, ItemEnchantType = { Temporary = 2, Imbue = 3 } },
+        Enum = { ItemClass = { Weapon = 2 }, ItemWeaponSubclass = { Fishingpole = 20 },
+            ItemEnchantType = { Temporary = 2, Imbue = 3 } },
         GetTime = function() return state.now end,
         time = function() return state.epoch + math.floor(state.now - 1000) end,
         GetProfessions = function() return state.professions[1] and 1, state.professions[2] and 2 end,
@@ -1444,6 +1445,22 @@ do
     Check("shadowform talented", t.Shown(), "spell:588 spell:15473")
 end
 
+-- Demonic Sacrifice: off until picked; any demon's sacrifice buff counts, and a click casts the sacrifice.
+do
+    local known = { [687] = true, [18788] = true }
+    local t = Fixture({ units = { player = "WARLOCK" }, known = known, auras = { player = { { 687, 1700, 1800 } } } })
+    t.Login()
+    Check("demonic sacrifice is off until picked", t.Shown(), "")
+    t = Fixture({ settings = { personalBuffPicks = { demonicSacrifice = true } }, units = { player = "WARLOCK" },
+        known = known, auras = { player = { { 687, 1700, 1800 } } } })
+    t.Login()
+    Check("no sacrifice buff", t.Shown(), "spell:18788")
+    t.state.auras.player = { { 687, 1700, 1800 }, { 18790, 1700, 1800 } }
+    t.Fire("UNIT_AURA", "player")
+    t.Advance(0.5)
+    Check("voidwalker sacrificed", t.Shown(), "")
+end
+
 -- Poisons: every equipped weapon needs one; an expiring poison wakes the row.
 do
     local t = Fixture({ units = { player = "ROGUE" }, known = { [2842] = true }, weapons = { [16] = false } })
@@ -1469,6 +1486,51 @@ do
     t.state.weapons[17] = 115
     t.Advance(185)
     Check("woken at two minutes left", t.Shown(), "spell:2842")
+end
+
+-- Firestone and Spellstone: off until picked, on the main hand, and a click with none carried creates one.
+do
+    local function Click(t)
+        for _, f in ipairs(t.frames) do
+            if rawget(f, "count") and f.shown and rawget(f, "attributes") then
+                local a = f.attributes
+                return (a.type1 or "") .. " " .. tostring(a.macrotext1 or a.spell1 or a.item1)
+            end
+        end
+    end
+    local known = { [6366] = true, [17951] = true, [2362] = true }
+    local t = Fixture({ units = { player = "WARLOCK" }, known = known, weapons = { [16] = false } })
+    t.Login()
+    Check("warlock stones are off until picked", t.Shown(), "")
+    t = Fixture({ settings = { personalBuffPicks = { firestone = true } }, units = { player = "WARLOCK" },
+        known = known, weapons = { [16] = false } })
+    t.Login()
+    Check("firestone picked: the best known rank", t.Shown(), "spell:17951")
+    Check("none carried: a click creates one", Click(t), "spell 17951")
+    t.state.combat = true
+    local stone
+    for _, f in ipairs(t.frames) do if rawget(f, "items") and f.shown then stone = f end end
+    t.Fire("UNIT_SPELLCAST_SENT", "player", "", "cast1", 17951)
+    stone.scripts.PostClick(stone, "LeftButton", false)
+    t.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast1", 17951)
+    Check("creating a stone does not fade its reminder", t.Faded(), "")
+    t.state.combat = false
+    t.state.bags = { 1254, 13699 }
+    t.Fire("BAG_UPDATE_DELAYED")
+    t.Advance(0.5)
+    Check("one carried: a click puts the best on the main hand", Click(t), "macro /use item:13699\n/use 16")
+    t.state.weapons[16] = 3600
+    t.Fire("WEAPON_ENCHANT_CHANGED")
+    t.Advance(0.5)
+    Check("stone on the main hand", t.Shown(), "")
+    t = Fixture({ settings = { personalBuffPicks = { firestone = true, spellstone = true } },
+        units = { player = "WARLOCK" }, known = known, weapons = { [16] = false } })
+    t.Login()
+    Check("both picked: both offered", t.Shown(), "spell:17951 spell:2362")
+    t.state.weapons[16] = 3600
+    t.Fire("WEAPON_ENCHANT_CHANGED")
+    t.Advance(0.5)
+    Check("either stone clears both", t.Shown(), "")
 end
 
 -- Every reminder does something on a click: a poison or stone goes on the weapon that lacks one, a buff is cast.
@@ -1739,7 +1801,7 @@ do
         if row.key == "personalBuffPicks" then fields[#fields + 1] = row.field end
     end
     Check("shaman picks come first, then every other class", table.concat(fields, " "),
-        "imbue shield demonArmor mageArmor poisons battleShout innerFire shadowform aspect trueshot huntersMark thorns")
+        "imbue shield demonArmor demonicSacrifice firestone spellstone mageArmor poisons battleShout innerFire shadowform aspect trueshot huntersMark thorns righteousFury")
     local extra
     for _, row in ipairs(card.rows) do
         if row.key == "personalBuffExtra" then extra = row end
@@ -2149,6 +2211,28 @@ do
     Check("both hands poisoned fades it", r.Faded(), poisons)
 end
 
+-- A fishing pole takes no imbue, poison or stone, so it asks for none.
+do
+    local t = Fixture({ units = { player = "SHAMAN" }, known = { [8017] = true }, weapons = { [16] = false },
+        subclasses = { [1016] = 20 } })
+    t.Login()
+    Check("no imbue asked for a fishing pole", t.Shown(), "")
+    t.state.subclasses[1016] = nil
+    t.Fire("UNIT_INVENTORY_CHANGED", "player")
+    t.Advance(0.5)
+    Check("the weapon back asks again", t.Shown(), "spell:8017")
+
+    local r = Fixture({ units = { player = "ROGUE" }, known = { [2842] = true }, weapons = { [16] = false },
+        subclasses = { [1016] = 20 } })
+    r.Login()
+    Check("no poison asked for a fishing pole", r.Shown(), "")
+
+    local m = Fixture({ instance = "raid", units = { player = "MAGE" }, weapons = { [16] = false },
+        subclasses = { [1016] = 20 }, settings = { weaponEnhancements = true, onlyIfCarried = false } })
+    m.Login()
+    Check("no stone asked for a fishing pole", m.Shown():find(ROUGH, 1, true), nil)
+end
+
 -- The Elemental Attractor or the Arcane Censer reminds while carried and Magical Awareness is missing, in the
 -- world and dungeons only, whatever the consumables' own World switch says. On by default.
 do
@@ -2379,6 +2463,54 @@ do
     Check("a click on the last tank missing it fades it", raid.Faded(), "spell:467")
 
     local mage = Fixture({ settings = { thornsTankOnly = true }, units = { player = "MAGE" } })
+    mage.Login()
+    Check("another class: no role events", mage.Listening("PLAYER_ROLES_ASSIGNED"), false)
+end
+
+-- Righteous Fury: only with Redoubt learned, or while you are the group's tank.
+do
+    local PICKED = { personalBuffPicks = { righteousFury = true } }
+    local unpicked = Fixture({ units = { player = "PALADIN" }, known = { [25780] = true, [20127] = true } })
+    unpicked.Login()
+    Check("off until picked", unpicked.Shown(), "")
+    Check("off: no role events", unpicked.Listening("PLAYER_ROLES_ASSIGNED"), false)
+
+    local healer = Fixture({ settings = PICKED, group = "party", units = { player = "PALADIN", party1 = "WARRIOR" },
+        roles = { player = "HEALER", party1 = "TANK" }, known = { [25780] = true },
+        auras = { player = {}, party1 = {} } })
+    healer.Login()
+    Check("no talent, not the tank: nothing", healer.Shown(), "")
+    Check("listens for roles and the group", healer.Listening("PLAYER_ROLES_ASSIGNED")
+        and healer.Listening("GROUP_ROSTER_UPDATE"), true)
+    healer.state.roles = { player = "TANK" }
+    healer.Fire("PLAYER_ROLES_ASSIGNED")
+    healer.Advance(0.5)
+    Check("given the Tank role: on you", healer.Shown(), "spell:25780")
+    healer.state.auras.player = { { 25780, 1700, 1800 } }
+    healer.Fire("UNIT_AURA", "player")
+    healer.Advance(0.5)
+    Check("up: nothing", healer.Shown(), "")
+    healer.state.auras.player = {}
+    healer.state.roles = {}
+    healer.state.mainTanks = { player = true }
+    healer.Fire("UNIT_AURA", "player")
+    healer.Fire("PLAYER_ROLES_ASSIGNED")
+    healer.Advance(0.5)
+    Check("a raid main tank counts as the tank", healer.Shown(), "spell:25780")
+    healer.state.mainTanks = {}
+    healer.Fire("GROUP_ROSTER_UPDATE")
+    healer.Advance(0.5)
+    Check("no longer the tank: gone", healer.Shown(), "")
+
+    local talented = Fixture({ settings = PICKED, units = { player = "PALADIN" },
+        known = { [25780] = true, [20127] = true } })
+    talented.Login()
+    Check("Redoubt learned, solo: on you", talented.Shown(), "spell:25780")
+    talented.Set("personalBuffPicks", { righteousFury = false })
+    Check("unpicked: nothing", talented.Shown(), "")
+    Check("unpicked: no role events", talented.Listening("PLAYER_ROLES_ASSIGNED"), false)
+
+    local mage = Fixture({ settings = PICKED, units = { player = "MAGE" }, known = { [25780] = true, [20127] = true } })
     mage.Login()
     Check("another class: no role events", mage.Listening("PLAYER_ROLES_ASSIGNED"), false)
 end

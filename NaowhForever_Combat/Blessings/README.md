@@ -93,6 +93,10 @@ NaowhForever_Combat/Blessings/
   member in range the button can reach lights it: red when someone is missing the class blessing,
   yellow when only running out, blue when only players on their own blessing need theirs. With
   Apply Theme to Status Colours they are the theme's Accent, its lighter Accent and a deeper shade.
+- Shift-click on a class button casts the normal blessing, never the Greater one, on the next member
+  due, stepping through every one of them (`singles`, its own queue and step); Shift-click on a player in
+  the list casts their Greater Blessing, which reaches their whole class. A modified click reads only
+  `shift-` attributes, so the plain left-click is unchanged.
 - A class button's left-click goes to the next member of its queue, so in combat (where the queue is
   the one from before the pull) repeated clicks go through those who needed it, round again after
   the last, as a missed click cannot be told from a cast. The button is its group header's child, and
@@ -200,7 +204,11 @@ NaowhForever_Combat/Blessings/
   shows the next spell and how many are due. The buttons take `/click` in a macro: `NaowhForeverBlessNext`,
   `NaowhForeverBlessNextGreater`, `NaowhForeverBlessAuto`, `NaowhForeverBlessAura`, `NaowhForeverBlessFury` and
   `NaowhForeverBlessSeal`. The wheel on the aura button cycles through the auras you know, and on the seal button
-  through your seals, out of combat. The Seal Button (off) casts the seal you picked by name, so it is always your
+  through your seals, out of combat. All Auras (off) puts a button for each aura you know in place of the aura
+  button (`NaowhForeverBlessAura<key>`, made the first time it is shown, so a new aura gets its button once combat
+  ends). Only one aura is up at a time, so they are never red: each icon is grey under Blizzard's managed aura
+  display, which draws it in colour while that aura is up, in combat too; without the display, grey means not up
+  at the last refresh. The Seal Button (off) casts the seal you picked by name, so it is always your
   highest rank. Blizzard's managed aura display shows that seal and its time left while it is up, in combat too,
   so every rank is listed: the aura is the rank you cast. Seals go only into that watch's list (`IDS`), not
   `FAMILY`, so a seal cast never runs the blessing cast tracker or the aura scan. A seal that is not up leaves the button as it is, not
