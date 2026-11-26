@@ -24,7 +24,6 @@ local WAIT_EVENTS = { "BAG_UPDATE_DELAYED", "UI_ERROR_MESSAGE" }
 local REFUSALS = { "ERR_INV_FULL", "ERR_BAG_FULL", "ERR_ITEM_MAX_COUNT", "ERR_NOT_ENOUGH_MONEY" }
 local CLOSE_SETTLE = 5
 local ERROR_SETTLE = 2
-local HIGH_PRICE = 1500000
 
 local merchant
 local shoppingList, shoppingPool, buyList, buyPool, buyParts = {}, {}, {}, {}, {}
@@ -33,6 +32,7 @@ local townSpots
 local waiting = false
 local autoArmed = false
 local closings, errorChecks = 0, 0
+local errorPending = false
 local AutoBuy, Open
 
 local function LearnedVendorItems()
@@ -198,7 +198,7 @@ end
 
 local function StopWaiting()
     wipe(expected)
-    waiting = false
+    waiting, errorPending = false, false
     if merchant then
         for _, event in ipairs(WAIT_EVENTS) do merchant:UnregisterEvent(event) end
     end
@@ -246,19 +246,24 @@ local function Refused(message)
 end
 
 local function EndWait()
-    waiting = false
+    waiting, errorPending = false, false
     if merchant then merchant:UnregisterEvent("UI_ERROR_MESSAGE") end
     P.ShoppingVendorView.OnMerchantEvent("UI_ERROR_MESSAGE")
 end
 
-local function OnUIError(message)
-    if Refused(message) then return EndWait() end
-    if not waiting then return end
+local function CountDownError()
     errorChecks = errorChecks + 1
     local check = errorChecks
     C_Timer.After(ERROR_SETTLE, function()
         if check == errorChecks and waiting then EndWait() end
     end)
+end
+
+local function OnUIError(message)
+    if Refused(message) then return EndWait() end
+    if not waiting then return end
+    errorPending = true
+    CountDownError()
 end
 
 local function MerchantLoaded()
@@ -294,7 +299,7 @@ end
 
 local function OnMerchantEvent(_, event, _, message)
     if event == "BAG_UPDATE_DELAYED" then
-        if Settle() then errorChecks = errorChecks + 1 end
+        if Settle() and errorPending and waiting then CountDownError() end
         TryAutoBuy()
         return P.Shopping.Redraw()
     end
@@ -444,8 +449,9 @@ function AutoBuy()
     local list, total = ShoppingNeeds(nil, true)
     if #list == 0 then return end
     autoArmed = false
-    local most = _G.MERCHANT_HIGH_PRICE_COST or HIGH_PRICE
-    if total > most then return ns.Print(TEXT_AUTO_TOO_DEAR:format(Text.Money(total), Text.Money(most))) end
+    if total >= MERCHANT_HIGH_PRICE_COST then
+        return ns.Print(TEXT_AUTO_TOO_DEAR:format(Text.Money(total), Text.Money(MERCHANT_HIGH_PRICE_COST)))
+    end
     BuyEntries(list, total, true)
 end
 

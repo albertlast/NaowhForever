@@ -651,8 +651,9 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   queued later in the visit then waits for the next one, instead of being bought on whatever
   `MERCHANT_UPDATE` comes next (selling junk, buyback). A merchant whose items have not loaded stays
   armed for the update that brings them.
-- A total above the game's `MERCHANT_HIGH_PRICE_COST` (`HIGH_PRICE`, 150 gold, when the client has none)
-  is left to Buy All, as the game's own merchant asks to confirm such a buy. It says so once in chat.
+- A total at or above the game's `MERCHANT_HIGH_PRICE_COST` (150 gold, defined in Forever's
+  `MerchantFrame.lua`) is left to Buy All. The game's own merchant asks to confirm from that amount on,
+  so it compares with `>=` too. It says so once in chat.
 - Apply replays `MERCHANT_SHOW` for a merchant already open, with `replay` set, and that never arms it.
   So changing a setting beside a merchant buys nothing. Turning Vendor Items on Shopping List off spends
   the visit.
@@ -668,10 +669,13 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   Otherwise it would never reach the list, and the next merchant would buy it again. A merchant opened
   again in that time waits for it to land, then buys what is still missing.
 - A refusal clears the wait at once: `ERR_INV_FULL`, `ERR_BAG_FULL`, `ERR_ITEM_MAX_COUNT` or
-  `ERR_NOT_ENOUGH_MONEY` (`REFUSALS`). Any other UI error clears it only when nothing lands within
-  `ERROR_SETTLE` seconds. A spell's error while a purchase lands used to clear it at once, and Buy All
-  could then buy the rest a second time. A merchant error not in `REFUSALS` (unique, reputation, sold out)
-  still ends the wait, so Buy and Buy All never stay greyed out for the visit.
+  `ERR_NOT_ENOUGH_MONEY` (`REFUSALS`). Any other UI error starts an `ERROR_SETTLE` countdown, and the
+  wait ends when nothing lands before it runs out. A spell's error while a purchase lands used to clear
+  it at once, and Buy All could then buy the rest a second time.
+- While such an error is outstanding (`errorPending`), each landing restarts the countdown. It does not
+  cancel it. A Buy All of two items, where one lands and the other failed with an error not in
+  `REFUSALS` (unique, reputation, sold out), still ends the wait, so Buy and Buy All never stay greyed
+  out for the visit. `EndWait` keeps `expected`, so an item that lands later still counts.
 - A vendor material's pin uses the shared waypoint system. Its built-in seller index is generated from
   Wowhead Classic's unlimited-stock inventories and matched to the Forever-adjusted NPC positions already
   in `Shared/Game/Towns.lua`; it has no runtime addon dependency. Merchant visits add to that

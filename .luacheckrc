@@ -37,7 +37,7 @@ globals = {
 -- The game's API and constants the addon reads. A name missing here is flagged, which is
 -- how a misspelled global, or one Forever does not have, gets caught.
 read_globals = {
-    "C_Bank", "BankFrame",
+    "C_Bank", "BankFrame", "MERCHANT_HIGH_PRICE_COST",
     "C_PlayerInfo", "GetLocale", "Screenshot", "AbbreviateLargeNumbers", "AbbreviateNumbers",
     "SetOverrideBinding", "SetOverrideBindingClick", "ClearOverrideBindings",
     "CLASS_SORT_ORDER", "CreateAbbreviateConfig",

@@ -131,6 +131,7 @@ local env = setmetatable({
     ERR_INV_FULL = "Inventory is full.",
     ERR_BAG_FULL = "That bag is full.",
     ERR_NOT_ENOUGH_MONEY = "You don't have enough money.",
+    MERCHANT_HIGH_PRICE_COST = 1500000,
     Enum = { ItemClass = { Tradegoods = 7 } },
     MerchantFrame = { IsShown = function() return merchantShown end },
     UnitName = function(unit) return unit == "npc" and vendorName or "Player" end,
@@ -281,14 +282,28 @@ drops[111], drops[222] = nil, nil
 V.BuyShoppingAll()
 viewEvents = 0
 Fire("UI_ERROR_MESSAGE", 0, "Not enough mana")
+Advance(1)
 bags[111] = 60
 Fire("BAG_UPDATE_DELAYED")
-Advance(2)
+Advance(1.5)
 check("an error while the purchase is landing keeps the wait for the rest, so Buy All cannot buy it twice",
     V.Waiting() and viewEvents == 0 and drops[111] == 10)
 bags[222] = 10
 Fire("BAG_UPDATE_DELAYED")
 check("until the rest lands", drops[222] == 5 and not V.Waiting())
+
+drops[111], drops[222] = nil, nil
+V.BuyShoppingAll()
+viewEvents = 0
+Fire("UI_ERROR_MESSAGE", 0, "You can only have one of those.")
+bags[111] = 70
+Fire("BAG_UPDATE_DELAYED")
+Advance(2)
+check("when one item of a Buy All lands and the other fails, the wait still ends, so Buy and Buy All work again",
+    not V.Waiting() and viewEvents == 1 and drops[111] == 10 and drops[222] == nil)
+bags[222] = 15
+Fire("BAG_UPDATE_DELAYED")
+check("and the other still counts if it lands after all", drops[222] == 5)
 
 drops[111] = nil
 V.BuyShoppingItem(111)
@@ -531,16 +546,23 @@ check("and nothing later in that visit either", #purchases == bought + 3)
 Leave()
 
 Fresh(7, 7)
-env.MERCHANT_HIGH_PRICE_COST = 450
+env.MERCHANT_HIGH_PRICE_COST = 501
 Visit()
-check("over the game's high-price mark it buys nothing", #purchases == bought)
+check("just under the game's high-price mark it buys", #purchases == bought + 3)
+Land()
+Leave()
+
+Fresh(7, 7)
+env.MERCHANT_HIGH_PRICE_COST = 500
+Visit()
+check("at the game's high-price mark it buys nothing, as the game's merchant asks there", #purchases == bought)
 check("and says to use Buy All, once", #messages == 1 and messages[1]:find("Buy All", 1, true) ~= nil)
 Fire("MERCHANT_UPDATE")
 check("not again on a merchant update", #messages == 1 and #purchases == bought)
 check("Buy All still buys it", V.BuyShoppingAll() == true and #purchases == bought + 3)
 Land()
 Leave()
-env.MERCHANT_HIGH_PRICE_COST = nil
+env.MERCHANT_HIGH_PRICE_COST = 1500000
 
 Fresh(0, 0)
 Visit()
