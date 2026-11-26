@@ -16,8 +16,6 @@ local WIDTH, HEIGHT = 760, 720
 local CARD = 6
 local TAB_MARGIN = 28
 local SEARCH_W = 260
-local SEARCH_MIN_W = 140
-local SEARCH_GAP = 12
 local TABS_TOP_GAP = 4
 local SCROLL_TOP_GAP = 8
 local SCROLL_GAP = 4
@@ -31,7 +29,7 @@ local FILTERS = {
     { key = "journal", label = "Field Journal", tip = "The fish you have caught, the herbs you have picked and the dishes you have cooked." },
     { key = "quests", label = "Quest List", tip = "Every quest of every zone, and where you are in each chain." },
     { key = "rares", label = "Rares", tip = "Every rare of every zone, and which of them you have killed." },
-    { key = "history", label = "Quest History", tip = "The quests you have taken, handed in and dropped, day by day." },
+    { key = "history", label = "History", tip = "The quests you have taken, handed in and dropped, day by day." },
 }
 local QUEST_TABS = { quests = true, rares = true, history = true }
 local PAGES = {
@@ -42,7 +40,7 @@ local PAGES = {
 local ATTUNE_PAGES = {
     { key = "raids", label = "Raids", tip = "The quest chain for each raid attunement, step by step." },
     { key = "dungeons", label = "Dungeons", tip = "The quest chain for each dungeon key, step by step." },
-    { key = "class", label = "Class", tip = "Your class's own quest chains, step by step." },
+    { key = "class", label = "Class", tip = "Your class's own quest chains and Tier 0.5, step by step." },
 }
 local RANKS = { "Apprentice", "Journeyman", "Expert", "Artisan" }
 local NO_EVENTS = {}
@@ -62,8 +60,10 @@ local TEXT_STEP_OF = ns.L("Step %d of %d")
 local TEXT_HAVE = ns.L("Done")
 local TEXT_ITEM = ns.L("Item ")
 local TEXT_OTHER_CLASS = ns.L("Other Class Quests")
+local TEXT_ONE_OF = ns.L("One of these, whichever you are given:")
 
 local window, scroll, view, questScroll
+local listTop, pagedTop
 local filter = "books"
 local page = "fish"
 local attunePage = "raids"
@@ -116,6 +116,29 @@ local function KeyLine(self, entry, at, total)
     return TEXT_KEY:format(name, have and TEXT_HAVE or TEXT_STEP_OF:format(at, total))
 end
 
+local function DrawKey(self, entry)
+    local steps = Attune.Steps(entry)
+    local at = Attune.At(entry)
+    local rows = 0
+    for _, step in ipairs(steps) do rows = rows + (type(step) == "table" and #step or 1) end
+    self:Section(entry.dungeon, rows)
+    self:Note(KeyLine(self, entry, at, #steps))
+    local n = 0
+    for i, step in ipairs(steps) do
+        if type(step) == "table" then
+            self:Note(TEXT_ONE_OF)
+            for _, id in ipairs(step) do
+                n = n + 1
+                self:Add("attune", id, i, Attune.State(id, i, at), n % 2 == 0)
+            end
+        else
+            n = n + 1
+            self:Add("attune", step, i, Attune.State(step, i, at), n % 2 == 0)
+        end
+    end
+    self:Space(Style.SECTION_GAP)
+end
+
 local function DrawClassChain(self, chain)
     local at, total = ns.Completo.Quests.ChainAt(chain)
     local rows = 0
@@ -133,6 +156,9 @@ local function DrawClassChain(self, chain)
 end
 
 local function DrawClass(self)
+    for _, entry in ipairs(ns.Attunements.list) do
+        if entry.class then DrawKey(self, entry) end
+    end
     local chains, singles = Attune.ClassQuests()
     for _, chain in ipairs(chains) do DrawClassChain(self, chain) end
     if #singles > 0 then self:Section(TEXT_OTHER_CLASS, #singles) end
@@ -146,14 +172,7 @@ local function DrawAttunements(self)
     if attunePage == "class" then return DrawClass(self) end
     local raids = attunePage == "raids"
     for _, entry in ipairs(ns.Attunements.list) do
-        if (entry.raid == true) == raids then
-            local steps = Attune.Steps(entry)
-            local at = Attune.At(entry)
-            self:Section(entry.dungeon, #steps)
-            self:Note(KeyLine(self, entry, at, #steps))
-            for i, id in ipairs(steps) do self:Add("attune", id, i, Attune.State(id, i, at), i % 2 == 0) end
-            self:Space(Style.SECTION_GAP)
-        end
+        if not entry.class and (entry.raid == true) == raids then DrawKey(self, entry) end
     end
     self:Fit(EVENTS)
 end
@@ -251,11 +270,18 @@ local function PaintNote()
     window.note:SetWidth(math.max(1, math.ceil(window.note.text:GetStringWidth())))
 end
 
+local function PlaceScroll(frame, top)
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", CARD + Style.CONTENT_INSET, -top)
+    frame:SetPoint("BOTTOMRIGHT", -(CARD + Style.SCROLLBAR + SCROLL_GAP), Style.WINDOW_FOOTER + CARD + Style.WINDOW_PAD)
+end
+
 local function ShowFilter(opening)
     local quests = QUEST_TABS[filter]
     scroll:SetShown(not quests)
     window.pages:SetShown(filter == "journal")
     window.attunePages:SetShown(filter == "attune")
+    PlaceScroll(scroll, (filter == "journal" or filter == "attune") and pagedTop or listTop)
     if quests then
         ns.Completo.Tabs.Show(filter, opening)
     else
@@ -286,11 +312,6 @@ local function PickAttunePage(key)
     view:Redraw()
 end
 
-local function PlaceScroll(frame, left, top, footer)
-    frame:SetPoint("TOPLEFT", left, -top)
-    frame:SetPoint("BOTTOMRIGHT", -(CARD + Style.SCROLLBAR + SCROLL_GAP), footer + CARD + Style.WINDOW_PAD)
-end
-
 local function Build()
     local header, footer = Style.WINDOW_HEADER, Style.WINDOW_FOOTER
     window = Parts.Window(WIDTH, HEIGHT, "discoveryWindow")
@@ -300,24 +321,24 @@ local function Build()
     window.note = Parts.FooterNote(window, "")
     local left, top = CARD + Style.CONTENT_INSET, header + CARD + Style.WINDOW_PAD + TABS_TOP_GAP
     window.filters = Parts.Tabs(window, 1, FILTERS, PickFilter)
-    Parts.FitTabs(window.filters, FILTERS, TAB_MARGIN, WIDTH - 2 * left - SEARCH_MIN_W - SEARCH_GAP)
+    Parts.FitTabs(window.filters, FILTERS, TAB_MARGIN, WIDTH - 2 * left)
     window.filters:SetPoint("TOPLEFT", left, -top)
     local width = WIDTH - left - CARD - Style.SCROLLBAR - Style.CONTENT_INSET
+    local rowTop = top + Style.TAB_H + Style.TAB_GAP
+    listTop = rowTop + SCROLL_TOP_GAP
+    pagedTop = rowTop + Style.TAB_H + Style.TAB_GAP + SCROLL_TOP_GAP
     questScroll = ns.UI.SlimScroll(window)
     local search = ns.Completo.Tabs.Build(window, questScroll, width)
-    local room = WIDTH - 2 * left - window.filters:GetWidth() - SEARCH_GAP
-    search:SetSize(math.max(SEARCH_MIN_W, math.min(SEARCH_W, room)), Style.SEARCH_H)
-    search:SetPoint("RIGHT", window, "TOPRIGHT", -left, -(top + Style.TAB_H / 2))
+    search:SetSize(SEARCH_W, Style.SEARCH_H)
+    search:SetPoint("LEFT", window, "TOPLEFT", left, -(rowTop + Style.TAB_H / 2))
     window.pages = Parts.Tabs(window, 1, PAGES, PickPage)
-    Parts.FitTabs(window.pages, PAGES, TAB_MARGIN, search:GetWidth())
-    window.pages:SetPoint("RIGHT", search, "RIGHT")
+    Parts.FitTabs(window.pages, PAGES, TAB_MARGIN, WIDTH - 2 * left)
+    window.pages:SetPoint("TOPLEFT", left, -rowTop)
     window.attunePages = Parts.Tabs(window, 1, ATTUNE_PAGES, PickAttunePage)
-    Parts.FitTabs(window.attunePages, ATTUNE_PAGES, TAB_MARGIN, search:GetWidth())
-    window.attunePages:SetPoint("RIGHT", search, "RIGHT")
-    top = top + Style.TAB_H + Style.TAB_GAP + SCROLL_TOP_GAP
+    Parts.FitTabs(window.attunePages, ATTUNE_PAGES, TAB_MARGIN, WIDTH - 2 * left)
+    window.attunePages:SetPoint("TOPLEFT", left, -rowTop)
     scroll = ns.UI.SlimScroll(window)
-    PlaceScroll(scroll, left, top, footer)
-    PlaceScroll(questScroll, left, top, footer)
+    PlaceScroll(questScroll, pagedTop)
     view = Shared.View.New(scroll, V.Kinds, Draw)
     view:SetWidth(width)
     scroll:SetScrollChild(view)

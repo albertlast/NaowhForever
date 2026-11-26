@@ -545,9 +545,11 @@ NaowhForever_QoL/
   side's decoded houses go never drops the other's, or two prices on one tooltip would decode a house
   again on every hover.
 - Every release carries every Forever auction house's prices of its hour (`NaowhForever_AuctionData`),
-  so tooltips, Waylaid Crates and Professions have prices before you ever scan. They load the first
-  time something asks for a price; only your region's houses of your faction and its Blackwater houses
-  are kept after that.
+  so tooltips, Waylaid Crates and Professions have prices before you ever scan. They load at login,
+  behind the loading screen, when a tooltip price, Bag Space's auction value or the Loot Feed's scanned
+  price is on, and otherwise the first time something asks for a price: loading and finding your house
+  is a hitch, and in the open world it landed on the first item hovered or looted. Only your region's
+  houses of your faction and its Blackwater houses are kept after that.
 - Blizzard's data does not say which of your faction's houses is yours, so the house is the one
   with the most items within 1% of your own last scan (at least 20). A new scan of your own looks
   again. A price then comes from your scan or that house, whichever is newer. Until a house is
@@ -559,6 +561,12 @@ NaowhForever_QoL/
   `ns.AuctionPrice` share one lookup, so the count is always from where the price came from, and a thin
   market can be told apart from a liquid one. A scan from before the counts
   has none, and reads as unknown.
+- A fast scan also keeps each item's median price (`house.medians`, dated by `house.medianTime`): the price
+  of the middle one of everything listed with a buyout, weighted by quantity, so one cheap single does not
+  move it. The release's prices carry one too, as a fourth field. A page by page scan has only each item's
+  lowest, so it leaves the last medians in place. `ns.AuctionMedianList` answers with the release's or
+  yours, whichever `ns.AuctionPriceList` would put first, for The Market's price history only; tooltips,
+  Sell and everything else still read the lowest.
 - Scans are stamped with `GetServerTime()`, as the release's prices carry Blizzard's time
   (Last-Modified), so a PC clock that is off still puts the newer one first.
 - Prices are also kept as you go (`AuctionSeen.lua`): whenever the game has already sent listings, the item's
@@ -589,7 +597,7 @@ NaowhForever_QoL/
   your own price here cannot chase itself down.
 - One event is one batch: every row is written straight into the table, and the others hear once at its end,
   only when something changed (`ns.AuctionSeenDone`): `ns.MarketPricesSeen` with the item IDs, for The
-  Market's price history, Bag Worth, Crafts and Farm, and `ns.AuctionPricesChanged` for Prices for Other
+  Market's Bag Worth, Crafts and Farm, and `ns.AuctionPricesChanged` for Prices for Other
   Addons. No window is redrawn and no Watch List line printed; those follow a full scan.
 - A post is noted from post-hooks on `C_AuctionHouse.PostItem` and `PostCommodity` (the item from its
   location, the buyout or unit price), which cover Blizzard's Sell tab and The Market's alike, and written on
@@ -726,8 +734,7 @@ NaowhForever_QoL/
   price is Professions' expected disenchant value before the auction house cut (`DisenchantValues.Expected`).
 - `RegisterForDBUpdate` callbacks run when a scan finishes and its prices are saved (`ns.AuctionPricesChanged`,
   from Auction Prices), and only while the global is ours. Each runs through `xpcall` with the game's error
-  handler, so another addon's broken callback is reported as its own and the rest still run. The release's prices loading is not an update: they load on the first
-  price asked for, inside that call.
+  handler, so another addon's broken callback is reported as its own and the rest still run. The release's prices loading is not an update: they load at login or inside the first price call.
 - The GCD Tracker reads only the player's own casts, and those are never secret.
 - Forever has no dedicated global cooldown spell, so the GCD Tracker watches one baseline spell
   per class with no cooldown of its own (`GCD_SPELLS`): any cooldown it shows is the global
@@ -1042,6 +1049,10 @@ NaowhForever_QoL/
 - Bag Space reads each slot through one reused item location (`C_Item.IsLocked`, `GetStackCount`,
   `GetItemQuality`, `GetItemIcon`) into one reused table, not `C_Container.GetContainerItemInfo`, which
   builds a new table per slot: with full bags, the scan after every craft made about 50 KB of garbage.
+- Bag Space prices each item once per scan, not once per stack: a bag of one item in many stacks
+  asked Auction Prices the same question for each. The prices it keeps last the frame of the scan
+  (`GetTime()`), so they never outlive it, and live in a `do` block because the file is at Lua 5.1's
+  limit of 200 locals in one chunk.
 - Never offered, whatever they are worth: reagents (class reagents such as Flash Powder and
   candles), projectiles, quivers, quest items and keys (item classes 5, 6, 11, 12 and 13), items
   in an equipment set, BiS items, fishing poles (weapon subclass 20) and profession tools. You need

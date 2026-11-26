@@ -452,6 +452,8 @@ What a comment in the code used to say, in short. The house rules behind it are 
   language gets them; one that only goes in one hand says which ("MH Sword", "OH Dagger").
 - `Items.ClassCanUse` reads an item's facts as `ItemFacts` holds them: `{ class, subclass, item
   level, required level, quality }`, class 2 a weapon, subclass 0 no armor type, 6 a shield.
+- Rogues use one-hand axes on Forever, unlike classic: the game's SkillRaceClassInfo gives Axes
+  (skill 44) to warriors and rogues (build 1.60.1.71091), and the weapon masters teach them One-Handed Axes.
 - `Items.SlotsFor` returns shared tables: read them, never change them.
 - `Items.SlotName` names a slot in the player's language. The cloak slot's catalog key is
   "Back (slot)", because "Back" alone is also the Back button; `enUS.lua` gives it its English
@@ -460,7 +462,9 @@ What a comment in the code used to say, in short. The house rules behind it are 
 ### Bags, tooltips, maps and /played
 
 - Bag marks hook each bag frame's `UpdateItems` with `hooksecurefunc`, never `SetScript`, and
-  only once a module first asks. EllesmereUI's bags are painted through the
+  only once a module first asks. The game updates a bag several times in one frame while you loot,
+  and each update repainted every slot once per module, so the paint waits for the next frame and runs
+  once for however many updates came in that frame. EllesmereUI's bags are painted through the
   `RegisterItemOverlayIcon` hook it offers other addons. `Bags.Baganator` hands back Baganator's
   public `Baganator.API` when it is loaded; a module registers its own corner widget there.
 - The guild list's tooltip is GameTooltip, so our lines go on it. The Friends list's tooltip has

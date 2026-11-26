@@ -93,7 +93,19 @@ quest and creature pages. Do not edit them by hand: change the tool and run it a
   are Dun Morogh's, so the quest's zone picks: a Dun Morogh quest keeps Dun Morogh's map.
   On the maps Forever redrew (Stormwind, Mulgore, Redridge, the Eastern Plaguelands) many of
   its spots are Classic's positions unconverted (Bolvar Fordragon at 78, 18), so a giver there
-  is never taken from it: those quests keep Wowhead's spot.
+  is never taken from it: those quests keep Wowhead's spot. Wowhead has moved some NPCs there to
+  Forever's map and not others (Anthion Harmon and Mulgore's new givers are Forever's, Tirion Fordring
+  and Nathanos Blightcaller still Classic's), so its spot is moved onto Forever's map only for a giver
+  the catalog does not place: one the catalog has on Forever's map there (its start for this quest or
+  another) stands where the catalog says. Journeys' turn-ins and camps go by the same rule.
+- Forever replaced the classic Tier 0.5 class quests (An Earnest Proposition, Just Compensation, Anthion's
+  Parting Words and Saving the Best for Last, 8905 to 9022) with its own (84147 to 84210, 97411 to 97414 for
+  the Horde paladin, 97447 to 97450 for the Alliance shaman), which share each classic version's completion
+  bit. ForeverChanges still lists the classic ones and not Forever's, so `completo_fixes.json` names
+  Forever's (`unlisted`) and the classic ones (`replaced`): the classic quests are left out, and Forever's
+  take their place in the chain. Wowhead gives most of Forever's no class, so `classes` sets each from its
+  reward, the class's Dungeon Set 2 piece or spec set box. Three have no giver on Wowhead, and it places
+  Anthion Harmon on Forever's Eastern Plaguelands already, so `givers` puts those at another version's giver.
 - Holiday quests are in, and taken only while their holiday is on: `D.Events[questID]` lists the holidays that
   give one (the game's Holidays IDs on Forever, from wago.tools), `D.Holidays` names them, and
   `D.FaireSpots[questID]` says where a Darkmoon Faire quest's giver stands for each Faire (Elwynn Forest's, 263,
@@ -181,6 +193,11 @@ quest and creature pages. Do not edit them by hand: change the tool and run it a
   for quest events only while it is shown. Which quests are yours (faction, race, class) is worked
   out once, the first time it is asked, and again only when a giver offers you one the data says is
   not yours.
+- What you have done, your log, skills, recipes, reputations and holidays are read again (`Quests.Refresh`)
+  only when one of them changes (`Quests.Stale`, from a quest accepted, turned in or removed, a level, a
+  skill or recipe learned, a reputation or the calendar) or a minute has passed (`Quests.Update`). The
+  full read takes tens of milliseconds, and the map's pins, the minimap's, every giver you speak to and
+  each search asked for it, so opening the map or changing zone stuttered.
 - The quests and rares (close to two megabytes once loaded) ship in `NaowhForever_DiscoveryData`, a
   load-on-demand addon. `ns.CompletoQuestData` and `ns.CompletoRareData` start empty with a hook
   that loads it on the first read of any field, so the files here keep the tables they took as they
@@ -306,7 +323,7 @@ quest and creature pages. Do not edit them by hand: change the tool and run it a
   `KEEP` (5000), about a character's whole levelling. A drop is the quest `C_QuestLog.SetAbandonQuest` was given
   when `C_QuestLog.AbandonQuest` runs (secure hooks on both): `QUEST_REMOVED` comes for a hand-in too, and
   which comes first is not documented. It keeps nothing from before it is turned on.
-- The Quest History tab shows the latest `HISTORY_SHOWN` (300) lines, newest first, a section per day; a
+- The History tab shows the latest `HISTORY_SHOWN` (300) lines, newest first, a section per day; a
   search reads every line's title.
 - Find's Creatures & Objects are every hand-in NPC and objective creature or object the data places, one per
   name and map at its first spot, named for the first of its quests that is yours and not done; one with none

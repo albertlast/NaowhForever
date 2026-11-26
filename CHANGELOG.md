@@ -3,8 +3,113 @@
 ## Unreleased
 
 ### Changed
+- Dungeon Journal: its data is updated to WoW Forever build 1.60.1.71139.
+- Dungeon Journal: boss loot updated from the latest Forever loot lists.
+
+## 1.4.11
+
+### Added
+- Discovery > Library Books > Waypoints > Nearest Book points a waypoint at the nearest library book
+  you still need in your zone, and at the next one once you loot it. Your own waypoints are left
+  alone.
+- Dungeon Journal: Blackmaw Hold's rares Sabella No-Eyes and Mopes and Shaper's Terrace's King Op,
+  with their drops. Blackmaw Hold's trash adds Spearfisher's Waders and Demon Worshipper's Necklace,
+  Shaper's Terrace's trash adds Pattern: Blue Dragonscale Helm, and the Avatar of Hakkar adds
+  Pattern: Mender's Leather Gauntlets.
+- Dungeon Journal: new class quests with their chains: Materials of Significance (Alliance paladins,
+  Maraudon and Blackrock Depths), The Talisman of Kazdor (rogues, Zul'Farrak), Dreadsteed of Xoroth
+  (warlocks, Dire Maul, on Lord Hel'nurath's card) and the Alliance's The Darkreaver Menace
+  (shamans, Scholomance).
+- Dungeon Journal: quest tips for The Coldbringer's Eye, Gahz'rilla's Mallet, Materials of
+  Significance, The Talisman of Kazdor and Prospect of Faith.
+- Dungeon map: Lorgus Jett's two other spawn spots in Blackfathom Deeps show as faded pins. In
+  Krol'dok Stronghold, Tunk and Zalfan Moonshadow show as quest pins and Nar'gurk's pin is where he
+  stands.
+- Dungeon Journal > Filters > Level Range: only list the loot for the required levels you type.
+  Leave a box empty for no limit.
+- Dungeon Journal: a quest that needs a reputation shows it above its objectives (for example
+  Requires Neutral with Timbermaw Hold), green when you have it and red when not, with your standing
+  on a small bar.
+- Dungeon Journal: in a quest's chain, the steps done inside a dungeon are marked with a skull and
+  the dungeon's name.
+- Dungeon Journal > PvP now has Warsong Gulch's Silverwing Sentinels and Warsong Outriders, and
+  Alterac Valley's Stormpike Guard and Frostwolf Clan. Each page has its rewards by standing (every
+  level of each), prices, its quartermaster on the map, and for Alterac Valley the insignia and Hero
+  quest chains with the standing each step needs. The PvP Rank page now shows what each Mark of
+  Honor buys.
+- Discovery > Attunements > Class shows the whole Tier 0.5 (Dungeon Set 2) questline for your class,
+  from An Earnest Proposition to Saving the Best for Last, with the step you are on, waypoints, a
+  row on the Attunements tracker and a map pin.
+- Settings > Colors: with the Custom theme, Background has an opacity, so the addon's windows can be
+  see-through to match the rest of your UI.
+
+### Changed
 - Dungeon Journal: its data is updated to WoW Forever build 1.60.1.71091.
 - Dungeon Journal: boss loot updated from the latest Forever loot lists.
+- The Market: the Price Graph shows each day's median price instead of its lowest, so one cheap
+  listing no longer drags a whole day down. Dropped, Rose and the tooltip's change and average
+  follow it. Days already in your history keep their lowest price until they age out.
+- Destroy Cheapest: the confirm click is cancelled when the stack, the item link, the loot shown or
+  the button changes.
+- Professions: with the Forever skin, the overview's profession cards use the game's own card art.
+- Professions: the overview hides in combat and the game's own overview shows until combat ends.
+- Professions: the overview cards no longer show the next-rank strip; the recipe window's rank
+  banner still shows it, with its waypoint.
+- Bag Space: scanning your bags after looting is faster with auction values on.
+- Consumable Bar: lighter while eating, drinking and buffing.
+- Dungeon Journal: "Level N to pick up" is red while you are under that level.
+
+### Fixed
+- Destroy Cheapest: All Items no longer offers quest items, keys, recipes, tools, set pieces, BiS
+  items or bound gear.
+- Destroy Cheapest: the fishing pole is protected like the other profession tools.
+- Destroy Cheapest: the second click checks the item again, including Keep Items Worth More Than,
+  and destroys nothing if it changed.
+- Professions: the overview's title bar shows Shopping List, Crafting Queue, Reagents and Alts, and
+  no longer keeps Disenchant or Skill-up Plan from the last recipe.
+- Quest List: opening the world map, changing zone or talking to quest givers no longer stutters
+  with the Quest List on.
+- Auction Prices: no more hitch on the first item you hover or loot after logging in.
+- Bags: looting with BiS marks, Bag Worth or Junk Marker on no longer stutters.
+- Favorite Patterns no longer searches the auction house as soon as it opens, which stalled Browse
+  and scans; click Scan on the panel to check live prices.
+- Professions: a new character no longer starts with another character's favourite recipes, crafting
+  queue or shopping list, so Favorite Patterns stops showing an alt's patterns.
+- Dungeon Journal: opening the map inside a dungeon no longer redraws the dungeon map's boss pins
+  each time.
+- Dungeon Journal: opening the map inside a dungeon no longer redraws the page beside it after a
+  group change or a wipe, and the dungeon map is ready from the loading screen.
+- Dungeon Journal: Uldaman and Razorfen Downs no longer say they are not open on Forever yet.
+- Dungeon Journal: Blackmaw Reclamation's chain now starts at Ekkal and needs all three of Korsa's
+  quests. Quests in Blackmaw Hold, Alcaz Prison, Krol'dok Stronghold, Zul'Farrak, Maraudon and
+  Razorfen Downs that had no giver now name one and get a waypoint.
+- Dungeon Journal: the Horde's The Darkreaver Menace is now Forever's version, so taking it no
+  longer shows the quest as lost. Nostro's Compendium shows only to warriors and paladins, and The
+  Medallion of Faith says it is repeatable. Also: Uldaman and Razorfen Downs were forced closed
+  ("open": false, set 15 Oct before players could enter them) and are open now;
+  `test-dungeon-journal.lua` marks Razorfen Downs closed only for its closed-page check.
+- Journeys: the Journey card times walks at your real speed, so mounting up or a speed buff shortens
+  the journey straight away.
+- Dungeon Journal: a Scholomance run now finishes without Kirtonos the Herald, who has to be
+  summoned. He is listed as optional.
+- Dungeon Journal and BiS List: rogues can use one-hand axes, so My Class Only, BiS picks and
+  upgrades include them.
+- Dungeon map: in the Stockade, Bruegal Ironknuckle's pin is in his cell instead of the room at the
+  end of the corridor, and Targorr the Dread's is in his cell. The other spots each of them can
+  spawn at show as faded pins.
+- Discovery > Quest List: the Tier 0.5 class quests (An Earnest Proposition, Just Compensation,
+  Anthion's Parting Words, Saving the Best for Last) are WoW Forever's own, at Forever's Deliana and
+  Mokvar, for every class including the Horde paladin and the Alliance shaman, in place of the
+  classic ones Forever no longer gives.
+- Quest List and Journeys: quest givers and turn-ins in Stormwind, Mulgore, Redridge and the Eastern
+  Plaguelands no longer point where the old map had them (Tirion Fordring, Nathanos Blightcaller,
+  Thunder Bluff's new givers and others).
+- The Market: the Ledger's name filter works again on characters whose saved sales include a vendor
+  or trainer with no name recorded, so the list no longer stays unfiltered until you scroll.
+- BiS List: Tier 0.5 (Dungeon Set 2) pieces name your own faction's vendor (Deliana in Ironforge for
+  the Alliance) and its waypoint, and Run Next says the vendor sells them.
+- BiS List: Generate BiS List no longer picks Tier 0.5 pieces before level 58, when their quests
+  start.
 
 ## 1.4.10
 
